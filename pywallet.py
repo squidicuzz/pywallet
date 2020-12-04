@@ -17,31 +17,31 @@ beta_version =  ('a' in pywversion.split('-')[0]) or ('b' in pywversion.split('-
 missing_dep = []
 
 try:
-	from bsddb.db import *
+    from bsddb.db import *
 except:
-	try:
-		from bsddb3.db import *
-	except:
-		missing_dep.append('bsddb')
+    try:
+        from bsddb3.db import *
+    except:
+        missing_dep.append('bsddb')
 
 import os, sys, time, re
 pyw_filename = os.path.basename(__file__)
 pyw_path = os.path.dirname(os.path.realpath(__file__))
 
 try:
-	for i in os.listdir('/usr/lib/python2.5/site-packages'):
-		if 'Twisted' in i:
-			sys.path.append('/usr/lib/python2.5/site-packages/'+i)
+    for i in os.listdir('/usr/lib/python2.5/site-packages'):
+        if 'Twisted' in i:
+            sys.path.append('/usr/lib/python2.5/site-packages/'+i)
 except:
-	''
+    ''
 
 try:
-	import json
+    import json
 except:
-	try:
-		 import simplejson as json
-	except:
-		 print("Json or simplejson package is needed")
+    try:
+         import simplejson as json
+    except:
+         print("Json or simplejson package is needed")
 
 import logging
 import struct
@@ -57,12 +57,12 @@ import urllib
 import math
 
 try:
-	from twisted.internet import reactor
-	from twisted.web import server, resource
-	from twisted.web.static import File
-	from twisted.python import log
+    from twisted.internet import reactor
+    from twisted.web import server, resource
+    from twisted.web.static import File
+    from twisted.python import log
 except:
-	missing_dep.append('twisted')
+    missing_dep.append('twisted')
 
 from datetime import datetime
 from subprocess import *
@@ -73,6 +73,7 @@ import platform
 
 max_version = 81000
 addrtype = 0
+akeytype = 0
 json_db = {}
 private_keys = []
 private_hex_keys = []
@@ -82,11 +83,16 @@ global_merging_message = ["",""]
 balance_site = 'https://blockchain.info/q/addressbalance/'
 aversions = {};
 for i in range(256):
-	aversions[i] = "version %d" % i;
+    aversions[i] = "version %d" % i;
 aversions[0] = 'Bitcoin';
 aversions[48] = 'Litecoin';
 aversions[52] = 'Namecoin';
 aversions[111] = 'Testnet';
+# Additional (squid)
+aversions[63] = 'SocialSend';
+aversions[71] = 'Vitaecoin';
+aversions[80] = 'Ohmcoin';
+
 
 wallet_dir = ""
 wallet_name = ""
@@ -104,33 +110,33 @@ prekeys = ["308201130201010420".decode('hex'), "308201120201010420".decode('hex'
 postkeys = ["a081a530".decode('hex'), "81a530".decode('hex')]
 
 def iais(a):
-	if a>= 2:
-		return 's'
-	else:
-		return ''
+    if a>= 2:
+        return 's'
+    else:
+        return ''
 
 def systype():
-	if platform.system() == "Darwin":
-		return 'Mac'
-	elif platform.system() == "Windows":
-		return 'Win'
-	return 'Linux'
+    if platform.system() == "Darwin":
+        return 'Mac'
+    elif platform.system() == "Windows":
+        return 'Win'
+    return 'Linux'
 
 def determine_db_dir():
-	if wallet_dir in "":
-		if platform.system() == "Darwin":
-			return os.path.expanduser("~/Library/Application Support/Bitcoin/")
-		elif platform.system() == "Windows":
-			return os.path.join(os.environ['APPDATA'], "Bitcoin")
-		return os.path.expanduser("~/.bitcoin")
-	else:
-		return wallet_dir
+    if wallet_dir in "":
+        if platform.system() == "Darwin":
+            return os.path.expanduser("~/Library/Application Support/Bitcoin/")
+        elif platform.system() == "Windows":
+            return os.path.join(os.environ['APPDATA'], "Bitcoin")
+        return os.path.expanduser("~/.bitcoin")
+    else:
+        return wallet_dir
 
 def determine_db_name():
-	if wallet_name in "":
-		return "wallet.dat"
-	else:
-		return wallet_name
+    if wallet_name in "":
+        return "wallet.dat"
+    else:
+        return wallet_name
 
 ########################
 # begin of aes.py code #
@@ -139,574 +145,574 @@ def determine_db_name():
 # from the SlowAES project, http://code.google.com/p/slowaes (aes.py)
 
 def append_PKCS7_padding(s):
-	"""return s padded to a multiple of 16-bytes by PKCS7 padding"""
-	numpads = 16 - (len(s)%16)
-	return s + numpads*chr(numpads)
+    """return s padded to a multiple of 16-bytes by PKCS7 padding"""
+    numpads = 16 - (len(s)%16)
+    return s + numpads*chr(numpads)
 
 def strip_PKCS7_padding(s):
-	"""return s stripped of PKCS7 padding"""
-	if len(s)%16 or not s:
-		raise ValueError("String of len %d can't be PCKS7-padded" % len(s))
-	numpads = ord(s[-1])
-	if numpads > 16:
-		raise ValueError("String ending with %r can't be PCKS7-padded" % s[-1])
-	return s[:-numpads]
+    """return s stripped of PKCS7 padding"""
+    if len(s)%16 or not s:
+        raise ValueError("String of len %d can't be PCKS7-padded" % len(s))
+    numpads = ord(s[-1])
+    if numpads > 16:
+        raise ValueError("String ending with %r can't be PCKS7-padded" % s[-1])
+    return s[:-numpads]
 
 class AES(object):
-	# valid key sizes
-	keySize = dict(SIZE_128=16, SIZE_192=24, SIZE_256=32)
+    # valid key sizes
+    keySize = dict(SIZE_128=16, SIZE_192=24, SIZE_256=32)
 
-	# Rijndael S-box
-	sbox =  [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67,
-			0x2b, 0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59,
-			0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0, 0xb7,
-			0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1,
-			0x71, 0xd8, 0x31, 0x15, 0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05,
-			0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75, 0x09, 0x83,
-			0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29,
-			0xe3, 0x2f, 0x84, 0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b,
-			0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf, 0xd0, 0xef, 0xaa,
-			0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c,
-			0x9f, 0xa8, 0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc,
-			0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2, 0xcd, 0x0c, 0x13, 0xec,
-			0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19,
-			0x73, 0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee,
-			0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb, 0xe0, 0x32, 0x3a, 0x0a, 0x49,
-			0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
-			0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4,
-			0xea, 0x65, 0x7a, 0xae, 0x08, 0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6,
-			0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a, 0x70,
-			0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9,
-			0x86, 0xc1, 0x1d, 0x9e, 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e,
-			0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf, 0x8c, 0xa1,
-			0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0,
-			0x54, 0xbb, 0x16]
+    # Rijndael S-box
+    sbox =  [0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67,
+            0x2b, 0xfe, 0xd7, 0xab, 0x76, 0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59,
+            0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0, 0xb7,
+            0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1,
+            0x71, 0xd8, 0x31, 0x15, 0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05,
+            0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75, 0x09, 0x83,
+            0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29,
+            0xe3, 0x2f, 0x84, 0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b,
+            0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf, 0xd0, 0xef, 0xaa,
+            0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c,
+            0x9f, 0xa8, 0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc,
+            0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2, 0xcd, 0x0c, 0x13, 0xec,
+            0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19,
+            0x73, 0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee,
+            0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb, 0xe0, 0x32, 0x3a, 0x0a, 0x49,
+            0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+            0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4,
+            0xea, 0x65, 0x7a, 0xae, 0x08, 0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6,
+            0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a, 0x70,
+            0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9,
+            0x86, 0xc1, 0x1d, 0x9e, 0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e,
+            0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf, 0x8c, 0xa1,
+            0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0,
+            0x54, 0xbb, 0x16]
 
-	# Rijndael Inverted S-box
-	rsbox = [0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3,
-			0x9e, 0x81, 0xf3, 0xd7, 0xfb , 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f,
-			0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb , 0x54,
-			0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b,
-			0x42, 0xfa, 0xc3, 0x4e , 0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24,
-			0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25 , 0x72, 0xf8,
-			0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d,
-			0x65, 0xb6, 0x92 , 0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda,
-			0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84 , 0x90, 0xd8, 0xab,
-			0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3,
-			0x45, 0x06 , 0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1,
-			0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b , 0x3a, 0x91, 0x11, 0x41,
-			0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6,
-			0x73 , 0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9,
-			0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e , 0x47, 0xf1, 0x1a, 0x71, 0x1d,
-			0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b ,
-			0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0,
-			0xfe, 0x78, 0xcd, 0x5a, 0xf4 , 0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07,
-			0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f , 0x60,
-			0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f,
-			0x93, 0xc9, 0x9c, 0xef , 0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5,
-			0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61 , 0x17, 0x2b,
-			0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55,
-			0x21, 0x0c, 0x7d]
+    # Rijndael Inverted S-box
+    rsbox = [0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3,
+            0x9e, 0x81, 0xf3, 0xd7, 0xfb , 0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f,
+            0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb , 0x54,
+            0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b,
+            0x42, 0xfa, 0xc3, 0x4e , 0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24,
+            0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25 , 0x72, 0xf8,
+            0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d,
+            0x65, 0xb6, 0x92 , 0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda,
+            0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84 , 0x90, 0xd8, 0xab,
+            0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3,
+            0x45, 0x06 , 0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1,
+            0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b , 0x3a, 0x91, 0x11, 0x41,
+            0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6,
+            0x73 , 0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9,
+            0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e , 0x47, 0xf1, 0x1a, 0x71, 0x1d,
+            0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b ,
+            0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0,
+            0xfe, 0x78, 0xcd, 0x5a, 0xf4 , 0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07,
+            0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f , 0x60,
+            0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f,
+            0x93, 0xc9, 0x9c, 0xef , 0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5,
+            0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61 , 0x17, 0x2b,
+            0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55,
+            0x21, 0x0c, 0x7d]
 
-	def getSBoxValue(self,num):
-		"""Retrieves a given S-Box Value"""
-		return self.sbox[num]
+    def getSBoxValue(self,num):
+        """Retrieves a given S-Box Value"""
+        return self.sbox[num]
 
-	def getSBoxInvert(self,num):
-		"""Retrieves a given Inverted S-Box Value"""
-		return self.rsbox[num]
+    def getSBoxInvert(self,num):
+        """Retrieves a given Inverted S-Box Value"""
+        return self.rsbox[num]
 
-	def rotate(self, word):
-		""" Rijndael's key schedule rotate operation.
+    def rotate(self, word):
+        """ Rijndael's key schedule rotate operation.
 
-		Rotate a word eight bits to the left: eg, rotate(1d2c3a4f) == 2c3a4f1d
-		Word is an char list of size 4 (32 bits overall).
-		"""
-		return word[1:] + word[:1]
+        Rotate a word eight bits to the left: eg, rotate(1d2c3a4f) == 2c3a4f1d
+        Word is an char list of size 4 (32 bits overall).
+        """
+        return word[1:] + word[:1]
 
-	# Rijndael Rcon
-	Rcon = [0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36,
-			0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97,
-			0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72,
-			0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66,
-			0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04,
-			0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d,
-			0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3,
-			0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61,
-			0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a,
-			0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
-			0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc,
-			0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5,
-			0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a,
-			0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d,
-			0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c,
-			0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35,
-			0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4,
-			0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc,
-			0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08,
-			0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
-			0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d,
-			0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2,
-			0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74,
-			0xe8, 0xcb ]
+    # Rijndael Rcon
+    Rcon = [0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36,
+            0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97,
+            0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72,
+            0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66,
+            0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04,
+            0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d,
+            0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3,
+            0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61,
+            0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a,
+            0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
+            0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc,
+            0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5,
+            0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a,
+            0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d,
+            0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c,
+            0xd8, 0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35,
+            0x6a, 0xd4, 0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4,
+            0xd3, 0xbd, 0x61, 0xc2, 0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc,
+            0x83, 0x1d, 0x3a, 0x74, 0xe8, 0xcb, 0x8d, 0x01, 0x02, 0x04, 0x08,
+            0x10, 0x20, 0x40, 0x80, 0x1b, 0x36, 0x6c, 0xd8, 0xab, 0x4d, 0x9a,
+            0x2f, 0x5e, 0xbc, 0x63, 0xc6, 0x97, 0x35, 0x6a, 0xd4, 0xb3, 0x7d,
+            0xfa, 0xef, 0xc5, 0x91, 0x39, 0x72, 0xe4, 0xd3, 0xbd, 0x61, 0xc2,
+            0x9f, 0x25, 0x4a, 0x94, 0x33, 0x66, 0xcc, 0x83, 0x1d, 0x3a, 0x74,
+            0xe8, 0xcb ]
 
-	def getRconValue(self, num):
-		"""Retrieves a given Rcon Value"""
-		return self.Rcon[num]
+    def getRconValue(self, num):
+        """Retrieves a given Rcon Value"""
+        return self.Rcon[num]
 
-	def core(self, word, iteration):
-		"""Key schedule core."""
-		# rotate the 32-bit word 8 bits to the left
-		word = self.rotate(word)
-		# apply S-Box substitution on all 4 parts of the 32-bit word
-		for i in range(4):
-			word[i] = self.getSBoxValue(word[i])
-		# XOR the output of the rcon operation with i to the first part
-		# (leftmost) only
-		word[0] = word[0] ^ self.getRconValue(iteration)
-		return word
+    def core(self, word, iteration):
+        """Key schedule core."""
+        # rotate the 32-bit word 8 bits to the left
+        word = self.rotate(word)
+        # apply S-Box substitution on all 4 parts of the 32-bit word
+        for i in range(4):
+            word[i] = self.getSBoxValue(word[i])
+        # XOR the output of the rcon operation with i to the first part
+        # (leftmost) only
+        word[0] = word[0] ^ self.getRconValue(iteration)
+        return word
 
-	def expandKey(self, key, size, expandedKeySize):
-		"""Rijndael's key expansion.
+    def expandKey(self, key, size, expandedKeySize):
+        """Rijndael's key expansion.
 
-		Expands an 128,192,256 key into an 176,208,240 bytes key
+        Expands an 128,192,256 key into an 176,208,240 bytes key
 
-		expandedKey is a char list of large enough size,
-		key is the non-expanded key.
-		"""
-		# current expanded keySize, in bytes
-		currentSize = 0
-		rconIteration = 1
-		expandedKey = [0] * expandedKeySize
+        expandedKey is a char list of large enough size,
+        key is the non-expanded key.
+        """
+        # current expanded keySize, in bytes
+        currentSize = 0
+        rconIteration = 1
+        expandedKey = [0] * expandedKeySize
 
-		# set the 16, 24, 32 bytes of the expanded key to the input key
-		for j in range(size):
-			expandedKey[j] = key[j]
-		currentSize += size
+        # set the 16, 24, 32 bytes of the expanded key to the input key
+        for j in range(size):
+            expandedKey[j] = key[j]
+        currentSize += size
 
-		while currentSize < expandedKeySize:
-			# assign the previous 4 bytes to the temporary value t
-			t = expandedKey[currentSize-4:currentSize]
+        while currentSize < expandedKeySize:
+            # assign the previous 4 bytes to the temporary value t
+            t = expandedKey[currentSize-4:currentSize]
 
-			# every 16,24,32 bytes we apply the core schedule to t
-			# and increment rconIteration afterwards
-			if currentSize % size == 0:
-				t = self.core(t, rconIteration)
-				rconIteration += 1
-			# For 256-bit keys, we add an extra sbox to the calculation
-			if size == self.keySize["SIZE_256"] and ((currentSize % size) == 16):
-				for l in range(4): t[l] = self.getSBoxValue(t[l])
+            # every 16,24,32 bytes we apply the core schedule to t
+            # and increment rconIteration afterwards
+            if currentSize % size == 0:
+                t = self.core(t, rconIteration)
+                rconIteration += 1
+            # For 256-bit keys, we add an extra sbox to the calculation
+            if size == self.keySize["SIZE_256"] and ((currentSize % size) == 16):
+                for l in range(4): t[l] = self.getSBoxValue(t[l])
 
-			# We XOR t with the four-byte block 16,24,32 bytes before the new
-			# expanded key.  This becomes the next four bytes in the expanded
-			# key.
-			for m in range(4):
-				expandedKey[currentSize] = expandedKey[currentSize - size] ^ \
-						t[m]
-				currentSize += 1
+            # We XOR t with the four-byte block 16,24,32 bytes before the new
+            # expanded key.  This becomes the next four bytes in the expanded
+            # key.
+            for m in range(4):
+                expandedKey[currentSize] = expandedKey[currentSize - size] ^ \
+                        t[m]
+                currentSize += 1
 
-		return expandedKey
+        return expandedKey
 
-	def addRoundKey(self, state, roundKey):
-		"""Adds (XORs) the round key to the state."""
-		for i in range(16):
-			state[i] ^= roundKey[i]
-		return state
+    def addRoundKey(self, state, roundKey):
+        """Adds (XORs) the round key to the state."""
+        for i in range(16):
+            state[i] ^= roundKey[i]
+        return state
 
-	def createRoundKey(self, expandedKey, roundKeyPointer):
-		"""Create a round key.
-		Creates a round key from the given expanded key and the
-		position within the expanded key.
-		"""
-		roundKey = [0] * 16
-		for i in range(4):
-			for j in range(4):
-				roundKey[j*4+i] = expandedKey[roundKeyPointer + i*4 + j]
-		return roundKey
+    def createRoundKey(self, expandedKey, roundKeyPointer):
+        """Create a round key.
+        Creates a round key from the given expanded key and the
+        position within the expanded key.
+        """
+        roundKey = [0] * 16
+        for i in range(4):
+            for j in range(4):
+                roundKey[j*4+i] = expandedKey[roundKeyPointer + i*4 + j]
+        return roundKey
 
-	def galois_multiplication(self, a, b):
-		"""Galois multiplication of 8 bit characters a and b."""
-		p = 0
-		for counter in range(8):
-			if b & 1: p ^= a
-			hi_bit_set = a & 0x80
-			a <<= 1
-			# keep a 8 bit
-			a &= 0xFF
-			if hi_bit_set:
-				a ^= 0x1b
-			b >>= 1
-		return p
+    def galois_multiplication(self, a, b):
+        """Galois multiplication of 8 bit characters a and b."""
+        p = 0
+        for counter in range(8):
+            if b & 1: p ^= a
+            hi_bit_set = a & 0x80
+            a <<= 1
+            # keep a 8 bit
+            a &= 0xFF
+            if hi_bit_set:
+                a ^= 0x1b
+            b >>= 1
+        return p
 
-	#
-	# substitute all the values from the state with the value in the SBox
-	# using the state value as index for the SBox
-	#
-	def subBytes(self, state, isInv):
-		if isInv: getter = self.getSBoxInvert
-		else: getter = self.getSBoxValue
-		for i in range(16): state[i] = getter(state[i])
-		return state
+    #
+    # substitute all the values from the state with the value in the SBox
+    # using the state value as index for the SBox
+    #
+    def subBytes(self, state, isInv):
+        if isInv: getter = self.getSBoxInvert
+        else: getter = self.getSBoxValue
+        for i in range(16): state[i] = getter(state[i])
+        return state
 
-	# iterate over the 4 rows and call shiftRow() with that row
-	def shiftRows(self, state, isInv):
-		for i in range(4):
-			state = self.shiftRow(state, i*4, i, isInv)
-		return state
+    # iterate over the 4 rows and call shiftRow() with that row
+    def shiftRows(self, state, isInv):
+        for i in range(4):
+            state = self.shiftRow(state, i*4, i, isInv)
+        return state
 
-	# each iteration shifts the row to the left by 1
-	def shiftRow(self, state, statePointer, nbr, isInv):
-		for i in range(nbr):
-			if isInv:
-				state[statePointer:statePointer+4] = \
-						state[statePointer+3:statePointer+4] + \
-						state[statePointer:statePointer+3]
-			else:
-				state[statePointer:statePointer+4] = \
-						state[statePointer+1:statePointer+4] + \
-						state[statePointer:statePointer+1]
-		return state
+    # each iteration shifts the row to the left by 1
+    def shiftRow(self, state, statePointer, nbr, isInv):
+        for i in range(nbr):
+            if isInv:
+                state[statePointer:statePointer+4] = \
+                        state[statePointer+3:statePointer+4] + \
+                        state[statePointer:statePointer+3]
+            else:
+                state[statePointer:statePointer+4] = \
+                        state[statePointer+1:statePointer+4] + \
+                        state[statePointer:statePointer+1]
+        return state
 
-	# galois multiplication of the 4x4 matrix
-	def mixColumns(self, state, isInv):
-		# iterate over the 4 columns
-		for i in range(4):
-			# construct one column by slicing over the 4 rows
-			column = state[i:i+16:4]
-			# apply the mixColumn on one column
-			column = self.mixColumn(column, isInv)
-			# put the values back into the state
-			state[i:i+16:4] = column
+    # galois multiplication of the 4x4 matrix
+    def mixColumns(self, state, isInv):
+        # iterate over the 4 columns
+        for i in range(4):
+            # construct one column by slicing over the 4 rows
+            column = state[i:i+16:4]
+            # apply the mixColumn on one column
+            column = self.mixColumn(column, isInv)
+            # put the values back into the state
+            state[i:i+16:4] = column
 
-		return state
+        return state
 
-	# galois multiplication of 1 column of the 4x4 matrix
-	def mixColumn(self, column, isInv):
-		if isInv: mult = [14, 9, 13, 11]
-		else: mult = [2, 1, 1, 3]
-		cpy = list(column)
-		g = self.galois_multiplication
+    # galois multiplication of 1 column of the 4x4 matrix
+    def mixColumn(self, column, isInv):
+        if isInv: mult = [14, 9, 13, 11]
+        else: mult = [2, 1, 1, 3]
+        cpy = list(column)
+        g = self.galois_multiplication
 
-		column[0] = g(cpy[0], mult[0]) ^ g(cpy[3], mult[1]) ^ \
-					g(cpy[2], mult[2]) ^ g(cpy[1], mult[3])
-		column[1] = g(cpy[1], mult[0]) ^ g(cpy[0], mult[1]) ^ \
-					g(cpy[3], mult[2]) ^ g(cpy[2], mult[3])
-		column[2] = g(cpy[2], mult[0]) ^ g(cpy[1], mult[1]) ^ \
-					g(cpy[0], mult[2]) ^ g(cpy[3], mult[3])
-		column[3] = g(cpy[3], mult[0]) ^ g(cpy[2], mult[1]) ^ \
-					g(cpy[1], mult[2]) ^ g(cpy[0], mult[3])
-		return column
+        column[0] = g(cpy[0], mult[0]) ^ g(cpy[3], mult[1]) ^ \
+                    g(cpy[2], mult[2]) ^ g(cpy[1], mult[3])
+        column[1] = g(cpy[1], mult[0]) ^ g(cpy[0], mult[1]) ^ \
+                    g(cpy[3], mult[2]) ^ g(cpy[2], mult[3])
+        column[2] = g(cpy[2], mult[0]) ^ g(cpy[1], mult[1]) ^ \
+                    g(cpy[0], mult[2]) ^ g(cpy[3], mult[3])
+        column[3] = g(cpy[3], mult[0]) ^ g(cpy[2], mult[1]) ^ \
+                    g(cpy[1], mult[2]) ^ g(cpy[0], mult[3])
+        return column
 
-	# applies the 4 operations of the forward round in sequence
-	def aes_round(self, state, roundKey):
-		state = self.subBytes(state, False)
-		state = self.shiftRows(state, False)
-		state = self.mixColumns(state, False)
-		state = self.addRoundKey(state, roundKey)
-		return state
+    # applies the 4 operations of the forward round in sequence
+    def aes_round(self, state, roundKey):
+        state = self.subBytes(state, False)
+        state = self.shiftRows(state, False)
+        state = self.mixColumns(state, False)
+        state = self.addRoundKey(state, roundKey)
+        return state
 
-	# applies the 4 operations of the inverse round in sequence
-	def aes_invRound(self, state, roundKey):
-		state = self.shiftRows(state, True)
-		state = self.subBytes(state, True)
-		state = self.addRoundKey(state, roundKey)
-		state = self.mixColumns(state, True)
-		return state
+    # applies the 4 operations of the inverse round in sequence
+    def aes_invRound(self, state, roundKey):
+        state = self.shiftRows(state, True)
+        state = self.subBytes(state, True)
+        state = self.addRoundKey(state, roundKey)
+        state = self.mixColumns(state, True)
+        return state
 
-	# Perform the initial operations, the standard round, and the final
-	# operations of the forward aes, creating a round key for each round
-	def aes_main(self, state, expandedKey, nbrRounds):
-		state = self.addRoundKey(state, self.createRoundKey(expandedKey, 0))
-		i = 1
-		while i < nbrRounds:
-			state = self.aes_round(state,
-								   self.createRoundKey(expandedKey, 16*i))
-			i += 1
-		state = self.subBytes(state, False)
-		state = self.shiftRows(state, False)
-		state = self.addRoundKey(state,
-								 self.createRoundKey(expandedKey, 16*nbrRounds))
-		return state
+    # Perform the initial operations, the standard round, and the final
+    # operations of the forward aes, creating a round key for each round
+    def aes_main(self, state, expandedKey, nbrRounds):
+        state = self.addRoundKey(state, self.createRoundKey(expandedKey, 0))
+        i = 1
+        while i < nbrRounds:
+            state = self.aes_round(state,
+                                   self.createRoundKey(expandedKey, 16*i))
+            i += 1
+        state = self.subBytes(state, False)
+        state = self.shiftRows(state, False)
+        state = self.addRoundKey(state,
+                                 self.createRoundKey(expandedKey, 16*nbrRounds))
+        return state
 
-	# Perform the initial operations, the standard round, and the final
-	# operations of the inverse aes, creating a round key for each round
-	def aes_invMain(self, state, expandedKey, nbrRounds):
-		state = self.addRoundKey(state,
-								 self.createRoundKey(expandedKey, 16*nbrRounds))
-		i = nbrRounds - 1
-		while i > 0:
-			state = self.aes_invRound(state,
-									  self.createRoundKey(expandedKey, 16*i))
-			i -= 1
-		state = self.shiftRows(state, True)
-		state = self.subBytes(state, True)
-		state = self.addRoundKey(state, self.createRoundKey(expandedKey, 0))
-		return state
+    # Perform the initial operations, the standard round, and the final
+    # operations of the inverse aes, creating a round key for each round
+    def aes_invMain(self, state, expandedKey, nbrRounds):
+        state = self.addRoundKey(state,
+                                 self.createRoundKey(expandedKey, 16*nbrRounds))
+        i = nbrRounds - 1
+        while i > 0:
+            state = self.aes_invRound(state,
+                                      self.createRoundKey(expandedKey, 16*i))
+            i -= 1
+        state = self.shiftRows(state, True)
+        state = self.subBytes(state, True)
+        state = self.addRoundKey(state, self.createRoundKey(expandedKey, 0))
+        return state
 
-	# encrypts a 128 bit input block against the given key of size specified
-	def encrypt(self, iput, key, size):
-		output = [0] * 16
-		# the number of rounds
-		nbrRounds = 0
-		# the 128 bit block to encode
-		block = [0] * 16
-		# set the number of rounds
-		if size == self.keySize["SIZE_128"]: nbrRounds = 10
-		elif size == self.keySize["SIZE_192"]: nbrRounds = 12
-		elif size == self.keySize["SIZE_256"]: nbrRounds = 14
-		else: return None
+    # encrypts a 128 bit input block against the given key of size specified
+    def encrypt(self, iput, key, size):
+        output = [0] * 16
+        # the number of rounds
+        nbrRounds = 0
+        # the 128 bit block to encode
+        block = [0] * 16
+        # set the number of rounds
+        if size == self.keySize["SIZE_128"]: nbrRounds = 10
+        elif size == self.keySize["SIZE_192"]: nbrRounds = 12
+        elif size == self.keySize["SIZE_256"]: nbrRounds = 14
+        else: return None
 
-		# the expanded keySize
-		expandedKeySize = 16*(nbrRounds+1)
+        # the expanded keySize
+        expandedKeySize = 16*(nbrRounds+1)
 
-		# Set the block values, for the block:
-		# a0,0 a0,1 a0,2 a0,3
-		# a1,0 a1,1 a1,2 a1,3
-		# a2,0 a2,1 a2,2 a2,3
-		# a3,0 a3,1 a3,2 a3,3
-		# the mapping order is a0,0 a1,0 a2,0 a3,0 a0,1 a1,1 ... a2,3 a3,3
-		#
-		# iterate over the columns
-		for i in range(4):
-			# iterate over the rows
-			for j in range(4):
-				block[(i+(j*4))] = iput[(i*4)+j]
+        # Set the block values, for the block:
+        # a0,0 a0,1 a0,2 a0,3
+        # a1,0 a1,1 a1,2 a1,3
+        # a2,0 a2,1 a2,2 a2,3
+        # a3,0 a3,1 a3,2 a3,3
+        # the mapping order is a0,0 a1,0 a2,0 a3,0 a0,1 a1,1 ... a2,3 a3,3
+        #
+        # iterate over the columns
+        for i in range(4):
+            # iterate over the rows
+            for j in range(4):
+                block[(i+(j*4))] = iput[(i*4)+j]
 
-		# expand the key into an 176, 208, 240 bytes key
-		# the expanded key
-		expandedKey = self.expandKey(key, size, expandedKeySize)
+        # expand the key into an 176, 208, 240 bytes key
+        # the expanded key
+        expandedKey = self.expandKey(key, size, expandedKeySize)
 
-		# encrypt the block using the expandedKey
-		block = self.aes_main(block, expandedKey, nbrRounds)
+        # encrypt the block using the expandedKey
+        block = self.aes_main(block, expandedKey, nbrRounds)
 
-		# unmap the block again into the output
-		for k in range(4):
-			# iterate over the rows
-			for l in range(4):
-				output[(k*4)+l] = block[(k+(l*4))]
-		return output
+        # unmap the block again into the output
+        for k in range(4):
+            # iterate over the rows
+            for l in range(4):
+                output[(k*4)+l] = block[(k+(l*4))]
+        return output
 
-	# decrypts a 128 bit input block against the given key of size specified
-	def decrypt(self, iput, key, size):
-		output = [0] * 16
-		# the number of rounds
-		nbrRounds = 0
-		# the 128 bit block to decode
-		block = [0] * 16
-		# set the number of rounds
-		if size == self.keySize["SIZE_128"]: nbrRounds = 10
-		elif size == self.keySize["SIZE_192"]: nbrRounds = 12
-		elif size == self.keySize["SIZE_256"]: nbrRounds = 14
-		else: return None
+    # decrypts a 128 bit input block against the given key of size specified
+    def decrypt(self, iput, key, size):
+        output = [0] * 16
+        # the number of rounds
+        nbrRounds = 0
+        # the 128 bit block to decode
+        block = [0] * 16
+        # set the number of rounds
+        if size == self.keySize["SIZE_128"]: nbrRounds = 10
+        elif size == self.keySize["SIZE_192"]: nbrRounds = 12
+        elif size == self.keySize["SIZE_256"]: nbrRounds = 14
+        else: return None
 
-		# the expanded keySize
-		expandedKeySize = 16*(nbrRounds+1)
+        # the expanded keySize
+        expandedKeySize = 16*(nbrRounds+1)
 
-		# Set the block values, for the block:
-		# a0,0 a0,1 a0,2 a0,3
-		# a1,0 a1,1 a1,2 a1,3
-		# a2,0 a2,1 a2,2 a2,3
-		# a3,0 a3,1 a3,2 a3,3
-		# the mapping order is a0,0 a1,0 a2,0 a3,0 a0,1 a1,1 ... a2,3 a3,3
+        # Set the block values, for the block:
+        # a0,0 a0,1 a0,2 a0,3
+        # a1,0 a1,1 a1,2 a1,3
+        # a2,0 a2,1 a2,2 a2,3
+        # a3,0 a3,1 a3,2 a3,3
+        # the mapping order is a0,0 a1,0 a2,0 a3,0 a0,1 a1,1 ... a2,3 a3,3
 
-		# iterate over the columns
-		for i in range(4):
-			# iterate over the rows
-			for j in range(4):
-				block[(i+(j*4))] = iput[(i*4)+j]
-		# expand the key into an 176, 208, 240 bytes key
-		expandedKey = self.expandKey(key, size, expandedKeySize)
-		# decrypt the block using the expandedKey
-		block = self.aes_invMain(block, expandedKey, nbrRounds)
-		# unmap the block again into the output
-		for k in range(4):
-			# iterate over the rows
-			for l in range(4):
-				output[(k*4)+l] = block[(k+(l*4))]
-		return output
+        # iterate over the columns
+        for i in range(4):
+            # iterate over the rows
+            for j in range(4):
+                block[(i+(j*4))] = iput[(i*4)+j]
+        # expand the key into an 176, 208, 240 bytes key
+        expandedKey = self.expandKey(key, size, expandedKeySize)
+        # decrypt the block using the expandedKey
+        block = self.aes_invMain(block, expandedKey, nbrRounds)
+        # unmap the block again into the output
+        for k in range(4):
+            # iterate over the rows
+            for l in range(4):
+                output[(k*4)+l] = block[(k+(l*4))]
+        return output
 
 class AESModeOfOperation(object):
 
-	aes = AES()
+    aes = AES()
 
-	# structure of supported modes of operation
-	modeOfOperation = dict(OFB=0, CFB=1, CBC=2)
+    # structure of supported modes of operation
+    modeOfOperation = dict(OFB=0, CFB=1, CBC=2)
 
-	# converts a 16 character string into a number array
-	def convertString(self, string, start, end, mode):
-		if end - start > 16: end = start + 16
-		if mode == self.modeOfOperation["CBC"]: ar = [0] * 16
-		else: ar = []
+    # converts a 16 character string into a number array
+    def convertString(self, string, start, end, mode):
+        if end - start > 16: end = start + 16
+        if mode == self.modeOfOperation["CBC"]: ar = [0] * 16
+        else: ar = []
 
-		i = start
-		j = 0
-		while len(ar) < end - start:
-			ar.append(0)
-		while i < end:
-			ar[j] = ord(string[i])
-			j += 1
-			i += 1
-		return ar
+        i = start
+        j = 0
+        while len(ar) < end - start:
+            ar.append(0)
+        while i < end:
+            ar[j] = ord(string[i])
+            j += 1
+            i += 1
+        return ar
 
-	# Mode of Operation Encryption
-	# stringIn - Input String
-	# mode - mode of type modeOfOperation
-	# hexKey - a hex key of the bit length size
-	# size - the bit length of the key
-	# hexIV - the 128 bit hex Initilization Vector
-	def encrypt(self, stringIn, mode, key, size, IV):
-		if len(key) % size:
-			return None
-		if len(IV) % 16:
-			return None
-		# the AES input/output
-		plaintext = []
-		iput = [0] * 16
-		output = []
-		ciphertext = [0] * 16
-		# the output cipher string
-		cipherOut = []
-		# char firstRound
-		firstRound = True
-		if stringIn != None:
-			for j in range(int(math.ceil(float(len(stringIn))/16))):
-				start = j*16
-				end = j*16+16
-				if  end > len(stringIn):
-					end = len(stringIn)
-				plaintext = self.convertString(stringIn, start, end, mode)
-				# print 'PT@%s:%s' % (j, plaintext)
-				if mode == self.modeOfOperation["CFB"]:
-					if firstRound:
-						output = self.aes.encrypt(IV, key, size)
-						firstRound = False
-					else:
-						output = self.aes.encrypt(iput, key, size)
-					for i in range(16):
-						if len(plaintext)-1 < i:
-							ciphertext[i] = 0 ^ output[i]
-						elif len(output)-1 < i:
-							ciphertext[i] = plaintext[i] ^ 0
-						elif len(plaintext)-1 < i and len(output) < i:
-							ciphertext[i] = 0 ^ 0
-						else:
-							ciphertext[i] = plaintext[i] ^ output[i]
-					for k in range(end-start):
-						cipherOut.append(ciphertext[k])
-					iput = ciphertext
-				elif mode == self.modeOfOperation["OFB"]:
-					if firstRound:
-						output = self.aes.encrypt(IV, key, size)
-						firstRound = False
-					else:
-						output = self.aes.encrypt(iput, key, size)
-					for i in range(16):
-						if len(plaintext)-1 < i:
-							ciphertext[i] = 0 ^ output[i]
-						elif len(output)-1 < i:
-							ciphertext[i] = plaintext[i] ^ 0
-						elif len(plaintext)-1 < i and len(output) < i:
-							ciphertext[i] = 0 ^ 0
-						else:
-							ciphertext[i] = plaintext[i] ^ output[i]
-					for k in range(end-start):
-						cipherOut.append(ciphertext[k])
-					iput = output
-				elif mode == self.modeOfOperation["CBC"]:
-					for i in range(16):
-						if firstRound:
-							iput[i] =  plaintext[i] ^ IV[i]
-						else:
-							iput[i] =  plaintext[i] ^ ciphertext[i]
-					# print 'IP@%s:%s' % (j, iput)
-					firstRound = False
-					ciphertext = self.aes.encrypt(iput, key, size)
-					# always 16 bytes because of the padding for CBC
-					for k in range(16):
-						cipherOut.append(ciphertext[k])
-		return mode, len(stringIn), cipherOut
+    # Mode of Operation Encryption
+    # stringIn - Input String
+    # mode - mode of type modeOfOperation
+    # hexKey - a hex key of the bit length size
+    # size - the bit length of the key
+    # hexIV - the 128 bit hex Initilization Vector
+    def encrypt(self, stringIn, mode, key, size, IV):
+        if len(key) % size:
+            return None
+        if len(IV) % 16:
+            return None
+        # the AES input/output
+        plaintext = []
+        iput = [0] * 16
+        output = []
+        ciphertext = [0] * 16
+        # the output cipher string
+        cipherOut = []
+        # char firstRound
+        firstRound = True
+        if stringIn != None:
+            for j in range(int(math.ceil(float(len(stringIn))/16))):
+                start = j*16
+                end = j*16+16
+                if  end > len(stringIn):
+                    end = len(stringIn)
+                plaintext = self.convertString(stringIn, start, end, mode)
+                # print 'PT@%s:%s' % (j, plaintext)
+                if mode == self.modeOfOperation["CFB"]:
+                    if firstRound:
+                        output = self.aes.encrypt(IV, key, size)
+                        firstRound = False
+                    else:
+                        output = self.aes.encrypt(iput, key, size)
+                    for i in range(16):
+                        if len(plaintext)-1 < i:
+                            ciphertext[i] = 0 ^ output[i]
+                        elif len(output)-1 < i:
+                            ciphertext[i] = plaintext[i] ^ 0
+                        elif len(plaintext)-1 < i and len(output) < i:
+                            ciphertext[i] = 0 ^ 0
+                        else:
+                            ciphertext[i] = plaintext[i] ^ output[i]
+                    for k in range(end-start):
+                        cipherOut.append(ciphertext[k])
+                    iput = ciphertext
+                elif mode == self.modeOfOperation["OFB"]:
+                    if firstRound:
+                        output = self.aes.encrypt(IV, key, size)
+                        firstRound = False
+                    else:
+                        output = self.aes.encrypt(iput, key, size)
+                    for i in range(16):
+                        if len(plaintext)-1 < i:
+                            ciphertext[i] = 0 ^ output[i]
+                        elif len(output)-1 < i:
+                            ciphertext[i] = plaintext[i] ^ 0
+                        elif len(plaintext)-1 < i and len(output) < i:
+                            ciphertext[i] = 0 ^ 0
+                        else:
+                            ciphertext[i] = plaintext[i] ^ output[i]
+                    for k in range(end-start):
+                        cipherOut.append(ciphertext[k])
+                    iput = output
+                elif mode == self.modeOfOperation["CBC"]:
+                    for i in range(16):
+                        if firstRound:
+                            iput[i] =  plaintext[i] ^ IV[i]
+                        else:
+                            iput[i] =  plaintext[i] ^ ciphertext[i]
+                    # print 'IP@%s:%s' % (j, iput)
+                    firstRound = False
+                    ciphertext = self.aes.encrypt(iput, key, size)
+                    # always 16 bytes because of the padding for CBC
+                    for k in range(16):
+                        cipherOut.append(ciphertext[k])
+        return mode, len(stringIn), cipherOut
 
-	# Mode of Operation Decryption
-	# cipherIn - Encrypted String
-	# originalsize - The unencrypted string length - required for CBC
-	# mode - mode of type modeOfOperation
-	# key - a number array of the bit length size
-	# size - the bit length of the key
-	# IV - the 128 bit number array Initilization Vector
-	def decrypt(self, cipherIn, originalsize, mode, key, size, IV):
-		# cipherIn = unescCtrlChars(cipherIn)
-		if len(key) % size:
-			return None
-		if len(IV) % 16:
-			return None
-		# the AES input/output
-		ciphertext = []
-		iput = []
-		output = []
-		plaintext = [0] * 16
-		# the output plain text string
-		stringOut = ''
-		# char firstRound
-		firstRound = True
-		if cipherIn != None:
-			for j in range(int(math.ceil(float(len(cipherIn))/16))):
-				start = j*16
-				end = j*16+16
-				if j*16+16 > len(cipherIn):
-					end = len(cipherIn)
-				ciphertext = cipherIn[start:end]
-				if mode == self.modeOfOperation["CFB"]:
-					if firstRound:
-						output = self.aes.encrypt(IV, key, size)
-						firstRound = False
-					else:
-						output = self.aes.encrypt(iput, key, size)
-					for i in range(16):
-						if len(output)-1 < i:
-							plaintext[i] = 0 ^ ciphertext[i]
-						elif len(ciphertext)-1 < i:
-							plaintext[i] = output[i] ^ 0
-						elif len(output)-1 < i and len(ciphertext) < i:
-							plaintext[i] = 0 ^ 0
-						else:
-							plaintext[i] = output[i] ^ ciphertext[i]
-					for k in range(end-start):
-						stringOut += chr(plaintext[k])
-					iput = ciphertext
-				elif mode == self.modeOfOperation["OFB"]:
-					if firstRound:
-						output = self.aes.encrypt(IV, key, size)
-						firstRound = False
-					else:
-						output = self.aes.encrypt(iput, key, size)
-					for i in range(16):
-						if len(output)-1 < i:
-							plaintext[i] = 0 ^ ciphertext[i]
-						elif len(ciphertext)-1 < i:
-							plaintext[i] = output[i] ^ 0
-						elif len(output)-1 < i and len(ciphertext) < i:
-							plaintext[i] = 0 ^ 0
-						else:
-							plaintext[i] = output[i] ^ ciphertext[i]
-					for k in range(end-start):
-						stringOut += chr(plaintext[k])
-					iput = output
-				elif mode == self.modeOfOperation["CBC"]:
-					output = self.aes.decrypt(ciphertext, key, size)
-					for i in range(16):
-						if firstRound:
-							plaintext[i] = IV[i] ^ output[i]
-						else:
-							plaintext[i] = iput[i] ^ output[i]
-					firstRound = False
-					if originalsize is not None and originalsize < end:
-						for k in range(originalsize-start):
-							stringOut += chr(plaintext[k])
-					else:
-						for k in range(end-start):
-							stringOut += chr(plaintext[k])
-					iput = ciphertext
-		return stringOut
+    # Mode of Operation Decryption
+    # cipherIn - Encrypted String
+    # originalsize - The unencrypted string length - required for CBC
+    # mode - mode of type modeOfOperation
+    # key - a number array of the bit length size
+    # size - the bit length of the key
+    # IV - the 128 bit number array Initilization Vector
+    def decrypt(self, cipherIn, originalsize, mode, key, size, IV):
+        # cipherIn = unescCtrlChars(cipherIn)
+        if len(key) % size:
+            return None
+        if len(IV) % 16:
+            return None
+        # the AES input/output
+        ciphertext = []
+        iput = []
+        output = []
+        plaintext = [0] * 16
+        # the output plain text string
+        stringOut = ''
+        # char firstRound
+        firstRound = True
+        if cipherIn != None:
+            for j in range(int(math.ceil(float(len(cipherIn))/16))):
+                start = j*16
+                end = j*16+16
+                if j*16+16 > len(cipherIn):
+                    end = len(cipherIn)
+                ciphertext = cipherIn[start:end]
+                if mode == self.modeOfOperation["CFB"]:
+                    if firstRound:
+                        output = self.aes.encrypt(IV, key, size)
+                        firstRound = False
+                    else:
+                        output = self.aes.encrypt(iput, key, size)
+                    for i in range(16):
+                        if len(output)-1 < i:
+                            plaintext[i] = 0 ^ ciphertext[i]
+                        elif len(ciphertext)-1 < i:
+                            plaintext[i] = output[i] ^ 0
+                        elif len(output)-1 < i and len(ciphertext) < i:
+                            plaintext[i] = 0 ^ 0
+                        else:
+                            plaintext[i] = output[i] ^ ciphertext[i]
+                    for k in range(end-start):
+                        stringOut += chr(plaintext[k])
+                    iput = ciphertext
+                elif mode == self.modeOfOperation["OFB"]:
+                    if firstRound:
+                        output = self.aes.encrypt(IV, key, size)
+                        firstRound = False
+                    else:
+                        output = self.aes.encrypt(iput, key, size)
+                    for i in range(16):
+                        if len(output)-1 < i:
+                            plaintext[i] = 0 ^ ciphertext[i]
+                        elif len(ciphertext)-1 < i:
+                            plaintext[i] = output[i] ^ 0
+                        elif len(output)-1 < i and len(ciphertext) < i:
+                            plaintext[i] = 0 ^ 0
+                        else:
+                            plaintext[i] = output[i] ^ ciphertext[i]
+                    for k in range(end-start):
+                        stringOut += chr(plaintext[k])
+                    iput = output
+                elif mode == self.modeOfOperation["CBC"]:
+                    output = self.aes.decrypt(ciphertext, key, size)
+                    for i in range(16):
+                        if firstRound:
+                            plaintext[i] = IV[i] ^ output[i]
+                        else:
+                            plaintext[i] = iput[i] ^ output[i]
+                    firstRound = False
+                    if originalsize is not None and originalsize < end:
+                        for k in range(originalsize-start):
+                            stringOut += chr(plaintext[k])
+                    else:
+                        for k in range(end-start):
+                            stringOut += chr(plaintext[k])
+                    iput = ciphertext
+        return stringOut
 
 ######################
 # end of aes.py code #
@@ -719,128 +725,128 @@ class AESModeOfOperation(object):
 crypter = None
 
 try:
-	from Crypto.Cipher import AES
-	crypter = 'pycrypto'
+    from Crypto.Cipher import AES
+    crypter = 'pycrypto'
 except:
-	pass
+    pass
 
 class Crypter_pycrypto( object ):
-	def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
-		if nDerivationMethod != 0:
-			return 0
-		data = vKeyData + vSalt
-		for i in xrange(nDerivIterations):
-			data = hashlib.sha512(data).digest()
-		self.SetKey(data[0:32])
-		self.SetIV(data[32:32+16])
-		return len(data)
+    def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
+        if nDerivationMethod != 0:
+            return 0
+        data = vKeyData + vSalt
+        for i in xrange(nDerivIterations):
+            data = hashlib.sha512(data).digest()
+        self.SetKey(data[0:32])
+        self.SetIV(data[32:32+16])
+        return len(data)
 
-	def SetKey(self, key):
-		self.chKey = key
+    def SetKey(self, key):
+        self.chKey = key
 
-	def SetIV(self, iv):
-		self.chIV = iv[0:16]
+    def SetIV(self, iv):
+        self.chIV = iv[0:16]
 
-	def Encrypt(self, data):
-		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).encrypt(append_PKCS7_padding(data))
+    def Encrypt(self, data):
+        return AES.new(self.chKey,AES.MODE_CBC,self.chIV).encrypt(append_PKCS7_padding(data))
 
-	def Decrypt(self, data):
-		return AES.new(self.chKey,AES.MODE_CBC,self.chIV).decrypt(data)[0:32]
+    def Decrypt(self, data):
+        return AES.new(self.chKey,AES.MODE_CBC,self.chIV).decrypt(data)[0:32]
 
 try:
-	if not crypter:
-		import ctypes
-		import ctypes.util
-		ssl = ctypes.cdll.LoadLibrary (ctypes.util.find_library ('ssl') or 'libeay32')
-		crypter = 'ssl'
+    if not crypter:
+        import ctypes
+        import ctypes.util
+        ssl = ctypes.cdll.LoadLibrary (ctypes.util.find_library ('ssl') or 'libeay32')
+        crypter = 'ssl'
 except:
-	pass
+    pass
 
 class Crypter_ssl(object):
-	def __init__(self):
-		self.chKey = ctypes.create_string_buffer (32)
-		self.chIV = ctypes.create_string_buffer (16)
+    def __init__(self):
+        self.chKey = ctypes.create_string_buffer (32)
+        self.chIV = ctypes.create_string_buffer (16)
 
-	def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
-		if nDerivationMethod != 0:
-			return 0
-		strKeyData = ctypes.create_string_buffer (vKeyData)
-		chSalt = ctypes.create_string_buffer (vSalt)
-		return ssl.EVP_BytesToKey(ssl.EVP_aes_256_cbc(), ssl.EVP_sha512(), chSalt, strKeyData,
-			len(vKeyData), nDerivIterations, ctypes.byref(self.chKey), ctypes.byref(self.chIV))
+    def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
+        if nDerivationMethod != 0:
+            return 0
+        strKeyData = ctypes.create_string_buffer (vKeyData)
+        chSalt = ctypes.create_string_buffer (vSalt)
+        return ssl.EVP_BytesToKey(ssl.EVP_aes_256_cbc(), ssl.EVP_sha512(), chSalt, strKeyData,
+            len(vKeyData), nDerivIterations, ctypes.byref(self.chKey), ctypes.byref(self.chIV))
 
-	def SetKey(self, key):
-		self.chKey = ctypes.create_string_buffer(key)
+    def SetKey(self, key):
+        self.chKey = ctypes.create_string_buffer(key)
 
-	def SetIV(self, iv):
-		self.chIV = ctypes.create_string_buffer(iv)
+    def SetIV(self, iv):
+        self.chIV = ctypes.create_string_buffer(iv)
 
-	def Encrypt(self, data):
-		buf = ctypes.create_string_buffer(len(data) + 16)
-		written = ctypes.c_int(0)
-		final = ctypes.c_int(0)
-		ctx = ssl.EVP_CIPHER_CTX_new()
-		ssl.EVP_CIPHER_CTX_init(ctx)
-		ssl.EVP_EncryptInit_ex(ctx, ssl.EVP_aes_256_cbc(), None, self.chKey, self.chIV)
-		ssl.EVP_EncryptUpdate(ctx, buf, ctypes.byref(written), data, len(data))
-		output = buf.raw[:written.value]
-		ssl.EVP_EncryptFinal_ex(ctx, buf, ctypes.byref(final))
-		output += buf.raw[:final.value]
-		return output
+    def Encrypt(self, data):
+        buf = ctypes.create_string_buffer(len(data) + 16)
+        written = ctypes.c_int(0)
+        final = ctypes.c_int(0)
+        ctx = ssl.EVP_CIPHER_CTX_new()
+        ssl.EVP_CIPHER_CTX_init(ctx)
+        ssl.EVP_EncryptInit_ex(ctx, ssl.EVP_aes_256_cbc(), None, self.chKey, self.chIV)
+        ssl.EVP_EncryptUpdate(ctx, buf, ctypes.byref(written), data, len(data))
+        output = buf.raw[:written.value]
+        ssl.EVP_EncryptFinal_ex(ctx, buf, ctypes.byref(final))
+        output += buf.raw[:final.value]
+        return output
 
-	def Decrypt(self, data):
-		buf = ctypes.create_string_buffer(len(data) + 16)
-		written = ctypes.c_int(0)
-		final = ctypes.c_int(0)
-		ctx = ssl.EVP_CIPHER_CTX_new()
-		ssl.EVP_CIPHER_CTX_init(ctx)
-		ssl.EVP_DecryptInit_ex(ctx, ssl.EVP_aes_256_cbc(), None, self.chKey, self.chIV)
-		ssl.EVP_DecryptUpdate(ctx, buf, ctypes.byref(written), data, len(data))
-		output = buf.raw[:written.value]
-		ssl.EVP_DecryptFinal_ex(ctx, buf, ctypes.byref(final))
-		output += buf.raw[:final.value]
-		return output
+    def Decrypt(self, data):
+        buf = ctypes.create_string_buffer(len(data) + 16)
+        written = ctypes.c_int(0)
+        final = ctypes.c_int(0)
+        ctx = ssl.EVP_CIPHER_CTX_new()
+        ssl.EVP_CIPHER_CTX_init(ctx)
+        ssl.EVP_DecryptInit_ex(ctx, ssl.EVP_aes_256_cbc(), None, self.chKey, self.chIV)
+        ssl.EVP_DecryptUpdate(ctx, buf, ctypes.byref(written), data, len(data))
+        output = buf.raw[:written.value]
+        ssl.EVP_DecryptFinal_ex(ctx, buf, ctypes.byref(final))
+        output += buf.raw[:final.value]
+        return output
 
 class Crypter_pure(object):
-	def __init__(self):
-		self.m = AESModeOfOperation()
-		self.cbc = self.m.modeOfOperation["CBC"]
-		self.sz = self.m.aes.keySize["SIZE_256"]
+    def __init__(self):
+        self.m = AESModeOfOperation()
+        self.cbc = self.m.modeOfOperation["CBC"]
+        self.sz = self.m.aes.keySize["SIZE_256"]
 
-	def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
-		if nDerivationMethod != 0:
-			return 0
-		data = vKeyData + vSalt
-		for i in xrange(nDerivIterations):
-			data = hashlib.sha512(data).digest()
-		self.SetKey(data[0:32])
-		self.SetIV(data[32:32+16])
-		return len(data)
+    def SetKeyFromPassphrase(self, vKeyData, vSalt, nDerivIterations, nDerivationMethod):
+        if nDerivationMethod != 0:
+            return 0
+        data = vKeyData + vSalt
+        for i in xrange(nDerivIterations):
+            data = hashlib.sha512(data).digest()
+        self.SetKey(data[0:32])
+        self.SetIV(data[32:32+16])
+        return len(data)
 
-	def SetKey(self, key):
-		self.chKey = [ord(i) for i in key]
+    def SetKey(self, key):
+        self.chKey = [ord(i) for i in key]
 
-	def SetIV(self, iv):
-		self.chIV = [ord(i) for i in iv]
+    def SetIV(self, iv):
+        self.chIV = [ord(i) for i in iv]
 
-	def Encrypt(self, data):
-		mode, size, cypher = self.m.encrypt(append_PKCS7_padding(data), self.cbc, self.chKey, self.sz, self.chIV)
-		return ''.join(map(chr, cypher))
+    def Encrypt(self, data):
+        mode, size, cypher = self.m.encrypt(append_PKCS7_padding(data), self.cbc, self.chKey, self.sz, self.chIV)
+        return ''.join(map(chr, cypher))
 
-	def Decrypt(self, data):
-		chData = [ord(i) for i in data]
-		return self.m.decrypt(chData, self.sz, self.cbc, self.chKey, self.sz, self.chIV)
+    def Decrypt(self, data):
+        chData = [ord(i) for i in data]
+        return self.m.decrypt(chData, self.sz, self.cbc, self.chKey, self.sz, self.chIV)
 
 if crypter == 'pycrypto':
-	crypter = Crypter_pycrypto()
-#	print "Crypter: pycrypto"
+    crypter = Crypter_pycrypto()
+#   print "Crypter: pycrypto"
 elif crypter == 'ssl':
-	crypter = Crypter_ssl()
-#	print "Crypter: ssl"
+    crypter = Crypter_ssl()
+#   print "Crypter: ssl"
 else:
-	crypter = Crypter_pure()
-#	print "Crypter: pure"
-	logging.warning("pycrypto or libssl not found, decryption may be slow")
+    crypter = Crypter_pure()
+#   print "Crypter: pure"
+    logging.warning("pycrypto or libssl not found, decryption may be slow")
 
 ##########################################
 # end of pywallet crypter implementation #
@@ -849,10 +855,10 @@ else:
 # secp256k1
 
 try:
-	_p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
+    _p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2FL
 except:
-	print "Python 3 is not supported, you need Python 2.7.x"
-	exit(1)
+    print "Python 3 is not supported, you need Python 2.7.x"
+    exit(1)
 _r = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141L
 _b = 0x0000000000000000000000000000000000000000000000000000000000000007L
 _a = 0x0000000000000000000000000000000000000000000000000000000000000000L
@@ -860,1567 +866,1569 @@ _Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798L
 _Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8L
 
 try:
-	import ecdsa
-	from ecdsa import der
-	curve_secp256k1 = ecdsa.ellipticcurve.CurveFp (_p, _a, _b)
-	generator_secp256k1 = g = ecdsa.ellipticcurve.Point (curve_secp256k1, _Gx, _Gy, _r)
-	randrange = random.SystemRandom().randrange
-	secp256k1 = ecdsa.curves.Curve ( "secp256k1", curve_secp256k1, generator_secp256k1, (1, 3, 132, 0, 10) )
-	ecdsa.curves.curves.append (secp256k1)
+    import ecdsa
+    from ecdsa import der
+    curve_secp256k1 = ecdsa.ellipticcurve.CurveFp (_p, _a, _b)
+    generator_secp256k1 = g = ecdsa.ellipticcurve.Point (curve_secp256k1, _Gx, _Gy, _r)
+    randrange = random.SystemRandom().randrange
+    secp256k1 = ecdsa.curves.Curve ( "secp256k1", curve_secp256k1, generator_secp256k1, (1, 3, 132, 0, 10) )
+    ecdsa.curves.curves.append (secp256k1)
 except:
-	missing_dep.append('ecdsa')
+    missing_dep.append('ecdsa')
 
 # python-ecdsa code (EC_KEY implementation)
 
 class CurveFp( object ):
-	def __init__( self, p, a, b ):
-		self.__p = p
-		self.__a = a
-		self.__b = b
+    def __init__( self, p, a, b ):
+        self.__p = p
+        self.__a = a
+        self.__b = b
 
-	def p( self ):
-		return self.__p
+    def p( self ):
+        return self.__p
 
-	def a( self ):
-		return self.__a
+    def a( self ):
+        return self.__a
 
-	def b( self ):
-		return self.__b
+    def b( self ):
+        return self.__b
 
-	def contains_point( self, x, y ):
-		return ( y * y - ( x * x * x + self.__a * x + self.__b ) ) % self.__p == 0
+    def contains_point( self, x, y ):
+        return ( y * y - ( x * x * x + self.__a * x + self.__b ) ) % self.__p == 0
 
 class Point( object ):
-	def __init__( self, curve, x, y, order = None ):
-		self.__curve = curve
-		self.__x = x
-		self.__y = y
-		self.__order = order
-		if self.__curve: assert self.__curve.contains_point( x, y )
-		if order: assert self * order == INFINITY
+    def __init__( self, curve, x, y, order = None ):
+        self.__curve = curve
+        self.__x = x
+        self.__y = y
+        self.__order = order
+        if self.__curve: assert self.__curve.contains_point( x, y )
+        if order: assert self * order == INFINITY
 
-	def __add__( self, other ):
-		if other == INFINITY: return self
-		if self == INFINITY: return other
-		assert self.__curve == other.__curve
-		if self.__x == other.__x:
-			if ( self.__y + other.__y ) % self.__curve.p() == 0:
-				return INFINITY
-			else:
-				return self.double()
+    def __add__( self, other ):
+        if other == INFINITY: return self
+        if self == INFINITY: return other
+        assert self.__curve == other.__curve
+        if self.__x == other.__x:
+            if ( self.__y + other.__y ) % self.__curve.p() == 0:
+                return INFINITY
+            else:
+                return self.double()
 
-		p = self.__curve.p()
-		l = ( ( other.__y - self.__y ) * \
-					inverse_mod( other.__x - self.__x, p ) ) % p
-		x3 = ( l * l - self.__x - other.__x ) % p
-		y3 = ( l * ( self.__x - x3 ) - self.__y ) % p
-		return Point( self.__curve, x3, y3 )
+        p = self.__curve.p()
+        l = ( ( other.__y - self.__y ) * \
+                    inverse_mod( other.__x - self.__x, p ) ) % p
+        x3 = ( l * l - self.__x - other.__x ) % p
+        y3 = ( l * ( self.__x - x3 ) - self.__y ) % p
+        return Point( self.__curve, x3, y3 )
 
-	def __mul__( self, other ):
-		def leftmost_bit( x ):
-			assert x > 0
-			result = 1L
-			while result <= x: result = 2 * result
-			return result / 2
+    def __mul__( self, other ):
+        def leftmost_bit( x ):
+            assert x > 0
+            result = 1L
+            while result <= x: result = 2 * result
+            return result / 2
 
-		e = other
-		if self.__order: e = e % self.__order
-		if e == 0: return INFINITY
-		if self == INFINITY: return INFINITY
-		assert e > 0
-		e3 = 3 * e
-		negative_self = Point( self.__curve, self.__x, -self.__y, self.__order )
-		i = leftmost_bit( e3 ) / 2
-		result = self
-		while i > 1:
-			result = result.double()
-			if ( e3 & i ) != 0 and ( e & i ) == 0: result = result + self
-			if ( e3 & i ) == 0 and ( e & i ) != 0: result = result + negative_self
-			i = i / 2
-		return result
+        e = other
+        if self.__order: e = e % self.__order
+        if e == 0: return INFINITY
+        if self == INFINITY: return INFINITY
+        assert e > 0
+        e3 = 3 * e
+        negative_self = Point( self.__curve, self.__x, -self.__y, self.__order )
+        i = leftmost_bit( e3 ) / 2
+        result = self
+        while i > 1:
+            result = result.double()
+            if ( e3 & i ) != 0 and ( e & i ) == 0: result = result + self
+            if ( e3 & i ) == 0 and ( e & i ) != 0: result = result + negative_self
+            i = i / 2
+        return result
 
-	def __rmul__( self, other ):
-		return self * other
+    def __rmul__( self, other ):
+        return self * other
 
-	def __str__( self ):
-		if self == INFINITY: return "infinity"
-		return "(%d,%d)" % ( self.__x, self.__y )
+    def __str__( self ):
+        if self == INFINITY: return "infinity"
+        return "(%d,%d)" % ( self.__x, self.__y )
 
-	def double( self ):
-		if self == INFINITY:
-			return INFINITY
+    def double( self ):
+        if self == INFINITY:
+            return INFINITY
 
-		p = self.__curve.p()
-		a = self.__curve.a()
-		l = ( ( 3 * self.__x * self.__x + a ) * \
-					inverse_mod( 2 * self.__y, p ) ) % p
-		x3 = ( l * l - 2 * self.__x ) % p
-		y3 = ( l * ( self.__x - x3 ) - self.__y ) % p
-		return Point( self.__curve, x3, y3 )
+        p = self.__curve.p()
+        a = self.__curve.a()
+        l = ( ( 3 * self.__x * self.__x + a ) * \
+                    inverse_mod( 2 * self.__y, p ) ) % p
+        x3 = ( l * l - 2 * self.__x ) % p
+        y3 = ( l * ( self.__x - x3 ) - self.__y ) % p
+        return Point( self.__curve, x3, y3 )
 
-	def x( self ):
-		return self.__x
+    def x( self ):
+        return self.__x
 
-	def y( self ):
-		return self.__y
+    def y( self ):
+        return self.__y
 
-	def curve( self ):
-		return self.__curve
+    def curve( self ):
+        return self.__curve
 
-	def order( self ):
-		return self.__order
+    def order( self ):
+        return self.__order
 
 INFINITY = Point( None, None, None )
 
 def inverse_mod( a, m ):
-	if a < 0 or m <= a: a = a % m
-	c, d = a, m
-	uc, vc, ud, vd = 1, 0, 0, 1
-	while c != 0:
-		q, c, d = divmod( d, c ) + ( c, )
-		uc, vc, ud, vd = ud - q*uc, vd - q*vc, uc, vc
-	assert d == 1
-	if ud > 0: return ud
-	else: return ud + m
+    if a < 0 or m <= a: a = a % m
+    c, d = a, m
+    uc, vc, ud, vd = 1, 0, 0, 1
+    while c != 0:
+        q, c, d = divmod( d, c ) + ( c, )
+        uc, vc, ud, vd = ud - q*uc, vd - q*vc, uc, vc
+    assert d == 1
+    if ud > 0: return ud
+    else: return ud + m
 
 class Signature( object ):
-	def __init__( self, r, s ):
-		self.r = r
-		self.s = s
+    def __init__( self, r, s ):
+        self.r = r
+        self.s = s
 
 class Public_key( object ):
-	def __init__( self, generator, point, c=None ):
-		self.curve = generator.curve()
-		self.generator = generator
-		self.point = point
-		self.compressed = c
-		n = generator.order()
-		if not n:
-			raise RuntimeError, "Generator point must have order."
-		if not n * point == INFINITY:
-			raise RuntimeError, "Generator point order is bad."
-		if point.x() < 0 or n <= point.x() or point.y() < 0 or n <= point.y():
-			raise RuntimeError, "Generator point has x or y out of range."
+    def __init__( self, generator, point, c=None ):
+        self.curve = generator.curve()
+        self.generator = generator
+        self.point = point
+        self.compressed = c
+        n = generator.order()
+        if not n:
+            raise RuntimeError, "Generator point must have order."
+        if not n * point == INFINITY:
+            raise RuntimeError, "Generator point order is bad."
+        if point.x() < 0 or n <= point.x() or point.y() < 0 or n <= point.y():
+            raise RuntimeError, "Generator point has x or y out of range."
 
-	def verifies( self, hash, signature ):
-		G = self.generator
-		n = G.order()
-		r = signature.r
-		s = signature.s
-		if r < 1 or r > n-1: return False
-		if s < 1 or s > n-1: return False
-		c = inverse_mod( s, n )
-		u1 = ( hash * c ) % n
-		u2 = ( r * c ) % n
-		xy = u1 * G + u2 * self.point
-		v = xy.x() % n
-		return v == r
+    def verifies( self, hash, signature ):
+        G = self.generator
+        n = G.order()
+        r = signature.r
+        s = signature.s
+        if r < 1 or r > n-1: return False
+        if s < 1 or s > n-1: return False
+        c = inverse_mod( s, n )
+        u1 = ( hash * c ) % n
+        u2 = ( r * c ) % n
+        xy = u1 * G + u2 * self.point
+        v = xy.x() % n
+        return v == r
 
-	def ser(self):
-		if self.compressed:
-			pk=('%02x'%(2+(self.point.y()&1))) + '%064x' % self.point.x()
-		else:
-			pk='04%064x%064x' % (self.point.x(), self.point.y())
+    def ser(self):
+        if self.compressed:
+            pk=('%02x'%(2+(self.point.y()&1))) + '%064x' % self.point.x()
+        else:
+            pk='04%064x%064x' % (self.point.x(), self.point.y())
 
-		return pk.decode('hex')
+        return pk.decode('hex')
 
-	def get_addr(self, v=0):
-		return public_key_to_bc_address(self.ser(), v)
+    def get_addr(self, v=0):
+        return public_key_to_bc_address(self.ser(), v)
 
 class Private_key( object ):
-	def __init__( self, public_key, secret_multiplier ):
-		self.public_key = public_key
-		self.secret_multiplier = secret_multiplier
+    def __init__( self, public_key, secret_multiplier ):
+        self.public_key = public_key
+        self.secret_multiplier = secret_multiplier
 
-	def der( self ):
-		hex_der_key = '06052b8104000a30740201010420' + \
-			'%064x' % self.secret_multiplier + \
-			'a00706052b8104000aa14403420004' + \
-			'%064x' % self.public_key.point.x() + \
-			'%064x' % self.public_key.point.y()
-		return hex_der_key.decode('hex')
+    def der( self ):
+        hex_der_key = '06052b8104000a30740201010420' + \
+            '%064x' % self.secret_multiplier + \
+            'a00706052b8104000aa14403420004' + \
+            '%064x' % self.public_key.point.x() + \
+            '%064x' % self.public_key.point.y()
+        return hex_der_key.decode('hex')
 
-	def sign( self, hash, random_k ):
-		G = self.public_key.generator
-		n = G.order()
-		k = random_k % n
-		p1 = k * G
-		r = p1.x()
-		if r == 0: raise RuntimeError, "amazingly unlucky random number r"
-		s = ( inverse_mod( k, n ) * \
-					( hash + ( self.secret_multiplier * r ) % n ) ) % n
-		if s == 0: raise RuntimeError, "amazingly unlucky random number s"
-		return Signature( r, s )
+    def sign( self, hash, random_k ):
+        G = self.public_key.generator
+        n = G.order()
+        k = random_k % n
+        p1 = k * G
+        r = p1.x()
+        if r == 0: raise RuntimeError, "amazingly unlucky random number r"
+        s = ( inverse_mod( k, n ) * \
+                    ( hash + ( self.secret_multiplier * r ) % n ) ) % n
+        if s == 0: raise RuntimeError, "amazingly unlucky random number s"
+        return Signature( r, s )
 
 class EC_KEY(object):
-	def __init__( self, secret ):
-		curve = CurveFp( _p, _a, _b )
-		generator = Point( curve, _Gx, _Gy, _r )
-		self.pubkey = Public_key( generator, generator * secret )
-		self.privkey = Private_key( self.pubkey, secret )
-		self.secret = secret
+    def __init__( self, secret ):
+        curve = CurveFp( _p, _a, _b )
+        generator = Point( curve, _Gx, _Gy, _r )
+        self.pubkey = Public_key( generator, generator * secret )
+        self.privkey = Private_key( self.pubkey, secret )
+        self.secret = secret
 
 # end of python-ecdsa code
 
 # pywallet openssl private key implementation
 
 def i2d_ECPrivateKey(pkey, compressed=False):#, crypted=True):
-	part3='a081a53081a2020101302c06072a8648ce3d0101022100'  # for uncompressed keys
-	if compressed:
-		if True:#not crypted:  ## Bitcoin accepts both part3's for crypted wallets...
-			part3='a08185308182020101302c06072a8648ce3d0101022100'  # for compressed keys
-		key = '3081d30201010420' + \
-			'%064x' % pkey.secret + \
-			part3 + \
-			'%064x' % _p + \
-			'3006040100040107042102' + \
-			'%064x' % _Gx + \
-			'022100' + \
-			'%064x' % _r + \
-			'020101a124032200'
-	else:
-		key = '308201130201010420' + \
-			'%064x' % pkey.secret + \
-			part3 + \
-			'%064x' % _p + \
-			'3006040100040107044104' + \
-			'%064x' % _Gx + \
-			'%064x' % _Gy + \
-			'022100' + \
-			'%064x' % _r + \
-			'020101a144034200'
+    part3='a081a53081a2020101302c06072a8648ce3d0101022100'  # for uncompressed keys
+    if compressed:
+        if True:#not crypted:  ## Bitcoin accepts both part3's for crypted wallets...
+            part3='a08185308182020101302c06072a8648ce3d0101022100'  # for compressed keys
+        key = '3081d30201010420' + \
+            '%064x' % pkey.secret + \
+            part3 + \
+            '%064x' % _p + \
+            '3006040100040107042102' + \
+            '%064x' % _Gx + \
+            '022100' + \
+            '%064x' % _r + \
+            '020101a124032200'
+    else:
+        key = '308201130201010420' + \
+            '%064x' % pkey.secret + \
+            part3 + \
+            '%064x' % _p + \
+            '3006040100040107044104' + \
+            '%064x' % _Gx + \
+            '%064x' % _Gy + \
+            '022100' + \
+            '%064x' % _r + \
+            '020101a144034200'
 
-	return key.decode('hex') + i2o_ECPublicKey(pkey, compressed)
+    return key.decode('hex') + i2o_ECPublicKey(pkey, compressed)
 
 def i2o_ECPublicKey(pkey, compressed=False):
-	# public keys are 65 bytes long (520 bits)
-	# 0x04 + 32-byte X-coordinate + 32-byte Y-coordinate
-	# 0x00 = point at infinity, 0x02 and 0x03 = compressed, 0x04 = uncompressed
-	# compressed keys: <sign> <x> where <sign> is 0x02 if y is even and 0x03 if y is odd
-	if compressed:
-		if pkey.pubkey.point.y() & 1:
-			key = '03' + '%064x' % pkey.pubkey.point.x()
-		else:
-			key = '02' + '%064x' % pkey.pubkey.point.x()
-	else:
-		key = '04' + \
-			'%064x' % pkey.pubkey.point.x() + \
-			'%064x' % pkey.pubkey.point.y()
+    # public keys are 65 bytes long (520 bits)
+    # 0x04 + 32-byte X-coordinate + 32-byte Y-coordinate
+    # 0x00 = point at infinity, 0x02 and 0x03 = compressed, 0x04 = uncompressed
+    # compressed keys: <sign> <x> where <sign> is 0x02 if y is even and 0x03 if y is odd
+    if compressed:
+        if pkey.pubkey.point.y() & 1:
+            key = '03' + '%064x' % pkey.pubkey.point.x()
+        else:
+            key = '02' + '%064x' % pkey.pubkey.point.x()
+    else:
+        key = '04' + \
+            '%064x' % pkey.pubkey.point.x() + \
+            '%064x' % pkey.pubkey.point.y()
 
-	return key.decode('hex')
+    return key.decode('hex')
 
 # bitcointools hashes and base58 implementation
 
 def hash_160(public_key):
- 	md = hashlib.new('ripemd160')
-	md.update(hashlib.sha256(public_key).digest())
-	return md.digest()
+    md = hashlib.new('ripemd160')
+    md.update(hashlib.sha256(public_key).digest())
+    return md.digest()
 
 def public_key_to_bc_address(public_key, v=None):
-	if v==None:
-		v=addrtype
-	h160 = hash_160(public_key)
-	return hash_160_to_bc_address(h160, v)
+    if v==None:
+        v=addrtype
+    h160 = hash_160(public_key)
+    return hash_160_to_bc_address(h160, v)
 
 def hash_160_to_bc_address(h160, v=None):
-	if v==None:
-		v=addrtype
-	vh160 = chr(v) + h160
-	h = Hash(vh160)
-	addr = vh160 + h[0:4]
-	return b58encode(addr)
+    if v==None:
+        v=addrtype
+    vh160 = chr(v) + h160
+    h = Hash(vh160)
+    addr = vh160 + h[0:4]
+    return b58encode(addr)
 
 def bc_address_to_hash_160(addr):
-	bytes = b58decode(addr, 25)
-	return bytes[1:21]
+    bytes = b58decode(addr, 25)
+    return bytes[1:21]
 
 __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 __b58base = len(__b58chars)
 
 def b58encode(v):
-	""" encode v, which is a string of bytes, to base58.
-	"""
+    """ encode v, which is a string of bytes, to base58.
+    """
 
-	long_value = 0L
-	for (i, c) in enumerate(v[::-1]):
-		long_value += (256**i) * ord(c)
+    long_value = 0L
+    for (i, c) in enumerate(v[::-1]):
+        long_value += (256**i) * ord(c)
 
-	result = ''
-	while long_value >= __b58base:
-		div, mod = divmod(long_value, __b58base)
-		result = __b58chars[mod] + result
-		long_value = div
-	result = __b58chars[long_value] + result
+    result = ''
+    while long_value >= __b58base:
+        div, mod = divmod(long_value, __b58base)
+        result = __b58chars[mod] + result
+        long_value = div
+    result = __b58chars[long_value] + result
 
-	# Bitcoin does a little leading-zero-compression:
-	# leading 0-bytes in the input become leading-1s
-	nPad = 0
-	for c in v:
-		if c == '\0': nPad += 1
-		else: break
+    # Bitcoin does a little leading-zero-compression:
+    # leading 0-bytes in the input become leading-1s
+    nPad = 0
+    for c in v:
+        if c == '\0': nPad += 1
+        else: break
 
-	return (__b58chars[0]*nPad) + result
+    return (__b58chars[0]*nPad) + result
 
 def b58decode(v, length):
-	""" decode v into a string of len bytes
-	"""
-	long_value = 0L
-	for (i, c) in enumerate(v[::-1]):
-		long_value += __b58chars.find(c) * (__b58base**i)
+    """ decode v into a string of len bytes
+    """
+    long_value = 0L
+    for (i, c) in enumerate(v[::-1]):
+        long_value += __b58chars.find(c) * (__b58base**i)
 
-	result = ''
-	while long_value >= 256:
-		div, mod = divmod(long_value, 256)
-		result = chr(mod) + result
-		long_value = div
-	result = chr(long_value) + result
+    result = ''
+    while long_value >= 256:
+        div, mod = divmod(long_value, 256)
+        result = chr(mod) + result
+        long_value = div
+    result = chr(long_value) + result
 
-	nPad = 0
-	for c in v:
-		if c == __b58chars[0]: nPad += 1
-		else: break
+    nPad = 0
+    for c in v:
+        if c == __b58chars[0]: nPad += 1
+        else: break
 
-	result = chr(0)*nPad + result
-	if length is not None and len(result) != length:
-		return None
+    result = chr(0)*nPad + result
+    if length is not None and len(result) != length:
+        return None
 
-	return result
+    return result
 
 # end of bitcointools base58 implementation
 
 # address handling code
 
 def long_hex(bytes):
-	return bytes.encode('hex_codec')
+    return bytes.encode('hex_codec')
 
 def Hash(data):
-	return hashlib.sha256(hashlib.sha256(data).digest()).digest()
+    return hashlib.sha256(hashlib.sha256(data).digest()).digest()
 
 def EncodeBase58Check(secret):
-	hash = Hash(secret)
-	return b58encode(secret + hash[0:4])
+    hash = Hash(secret)
+    return b58encode(secret + hash[0:4])
 
 def DecodeBase58Check(sec):
-	vchRet = b58decode(sec, None)
-	secret = vchRet[0:-4]
-	csum = vchRet[-4:]
-	hash = Hash(secret)
-	cs32 = hash[0:4]
-	if cs32 != csum:
-		return None
-	else:
-		return secret
+    vchRet = b58decode(sec, None)
+    secret = vchRet[0:-4]
+    csum = vchRet[-4:]
+    hash = Hash(secret)
+    cs32 = hash[0:4]
+    if cs32 != csum:
+        return None
+    else:
+        return secret
 
 def str_to_long(b):
-	res = 0
-	pos = 1
-	for a in reversed(b):
-		res += ord(a) * pos
-		pos *= 256
-	return res
+    res = 0
+    pos = 1
+    for a in reversed(b):
+        res += ord(a) * pos
+        pos *= 256
+    return res
 
 def PrivKeyToSecret(privkey):
-	if len(privkey) == 279:
-		return privkey[9:9+32]
-	else:
-		return privkey[8:8+32]
+    if len(privkey) == 279:
+        return privkey[9:9+32]
+    else:
+        return privkey[8:8+32]
 
 def SecretToASecret(secret, compressed=False):
-	prefix = chr((addrtype+128)&255)
-	if addrtype==48:  #assuming Litecoin
-		prefix = chr(128)
-	vchIn = prefix + secret
-	if compressed: vchIn += '\01'
-	return EncodeBase58Check(vchIn)
+    prefix = chr((akeytype)&255)
+    if addrtype==48:  #assuming Litecoin
+        prefix = chr(128)
+    vchIn = prefix + secret
+    if compressed: vchIn += '\01'
+    return EncodeBase58Check(vchIn)
 
 def ASecretToSecret(sec):
-	vch = DecodeBase58Check(sec)
-	if not vch:
-		return False
-	if vch[0] != chr((addrtype+128)&255):
-		print 'Warning: adress prefix seems bad (%d vs %d)'%(ord(vch[0]), (addrtype+128)&255)
-	return vch[1:]
+    vch = DecodeBase58Check(sec)
+    if not vch:
+        return False
+    if vch[0] != chr((akeytype)&255):
+        print 'Warning: adress prefix seems bad (%d vs %d)'%(ord(vch[0]), (akeytype)&255)
+    return vch[1:]
 
 def regenerate_key(sec):
-	b = ASecretToSecret(sec)
-	if not b:
-		return False
-	b = b[0:32]
-	secret = int('0x' + b.encode('hex'), 16)
-	return EC_KEY(secret)
+    b = ASecretToSecret(sec)
+    if not b:
+        return False
+    b = b[0:32]
+    secret = int('0x' + b.encode('hex'), 16)
+    return EC_KEY(secret)
 
 def GetPubKey(pkey, compressed=False):
-	return i2o_ECPublicKey(pkey, compressed)
+    return i2o_ECPublicKey(pkey, compressed)
 
 def GetPrivKey(pkey, compressed=False):
-	return i2d_ECPrivateKey(pkey, compressed)
+    return i2d_ECPrivateKey(pkey, compressed)
 
 def GetSecret(pkey):
-	return ('%064x' % pkey.secret).decode('hex')
+    return ('%064x' % pkey.secret).decode('hex')
 
 def is_compressed(sec):
-	b = ASecretToSecret(sec)
-	return len(b) == 33
+    b = ASecretToSecret(sec)
+    return len(b) == 33
 
 # bitcointools wallet.dat handling code
 
 def create_env(db_dir):
-	db_env = DBEnv(0)
-	r = db_env.open(db_dir, (DB_CREATE|DB_INIT_LOCK|DB_INIT_LOG|DB_INIT_MPOOL|DB_INIT_TXN|DB_THREAD|DB_RECOVER))
-	return db_env
+    db_env = DBEnv(0)
+    r = db_env.open(db_dir, (DB_CREATE|DB_INIT_LOCK|DB_INIT_LOG|DB_INIT_MPOOL|DB_INIT_TXN|DB_THREAD|DB_RECOVER))
+    return db_env
 
 def parse_CAddress(vds):
-	d = {'ip':'0.0.0.0','port':0,'nTime': 0}
-	try:
-		d['nVersion'] = vds.read_int32()
-		d['nTime'] = vds.read_uint32()
-		d['nServices'] = vds.read_uint64()
-		d['pchReserved'] = vds.read_bytes(12)
-		d['ip'] = socket.inet_ntoa(vds.read_bytes(4))
-		d['port'] = vds.read_uint16()
-	except:
-		pass
-	return d
+    d = {'ip':'0.0.0.0','port':0,'nTime': 0}
+    try:
+        d['nVersion'] = vds.read_int32()
+        d['nTime'] = vds.read_uint32()
+        d['nServices'] = vds.read_uint64()
+        d['pchReserved'] = vds.read_bytes(12)
+        d['ip'] = socket.inet_ntoa(vds.read_bytes(4))
+        d['port'] = vds.read_uint16()
+    except:
+        pass
+    return d
 
 def deserialize_CAddress(d):
-	return d['ip']+":"+str(d['port'])
+    return d['ip']+":"+str(d['port'])
 
 def parse_BlockLocator(vds):
-	d = { 'hashes' : [] }
-	nHashes = vds.read_compact_size()
-	for i in xrange(nHashes):
-		d['hashes'].append(vds.read_bytes(32))
-		return d
+    d = { 'hashes' : [] }
+    nHashes = vds.read_compact_size()
+    for i in xrange(nHashes):
+        d['hashes'].append(vds.read_bytes(32))
+        return d
 
 def deserialize_BlockLocator(d):
   result = "Block Locator top: "+d['hashes'][0][::-1].encode('hex_codec')
   return result
 
 def parse_setting(setting, vds):
-	if setting[0] == "f":	# flag (boolean) settings
-		return str(vds.read_boolean())
-	elif setting[0:4] == "addr": # CAddress
-		d = parse_CAddress(vds)
-		return deserialize_CAddress(d)
-	elif setting == "nTransactionFee":
-		return vds.read_int64()
-	elif setting == "nLimitProcessors":
-		return vds.read_int32()
-	return 'unknown setting'
+    if setting[0] == "f":   # flag (boolean) settings
+        return str(vds.read_boolean())
+    elif setting[0:4] == "addr": # CAddress
+        d = parse_CAddress(vds)
+        return deserialize_CAddress(d)
+    elif setting == "nTransactionFee":
+        return vds.read_int64()
+    elif setting == "nLimitProcessors":
+        return vds.read_int32()
+    return 'unknown setting'
 
 class SerializationError(Exception):
-	""" Thrown when there's a problem deserializing or serializing """
+    """ Thrown when there's a problem deserializing or serializing """
 
 
 def search_patterns_on_disk(device, size, inc, patternlist):   # inc must be higher than 1k
-	try:
-		otype=os.O_RDONLY|os.O_BINARY
-	except:
-		otype=os.O_RDONLY
-	try:
-		fd = os.open(device, otype)
-	except Exception as e:
-		print "Can't open %s, check the path or try as root"%device
-		print "  Error:", e.args
-		exit(0)
+    try:
+        otype=os.O_RDONLY|os.O_BINARY
+    except:
+        otype=os.O_RDONLY
+    try:
+        fd = os.open(device, otype)
+    except Exception as e:
+        print "Can't open %s, check the path or try as root"%device
+        print "  Error:", e.args
+        exit(0)
 
-	i = 0
-	data=''
+    i = 0
+    data=''
 
-	tzero=time.time()
-	sizetokeep=0
-	BlocksToInspect=dict(map(lambda x:[x,[]], patternlist))
-	syst=systype()
-	lendataloaded=None
-	writeProgressEvery=100*Mo
-	while i < int(size) and (lendataloaded!=0 or lendataloaded==None):
-		if int(i/writeProgressEvery)!=int((i+inc)/writeProgressEvery):
-			print "%.2f Go read"%(i/1e9)
-		try:
-			datakept=data[-sizetokeep:]
-			data = datakept+os.read(fd, inc)
-			lendataloaded = len(data)-len(datakept)   #should be inc
-			for text in patternlist:
-				if text in data:
-					BlocksToInspect[text].append([i-len(datakept), data, len(datakept)])
-					pass
-			sizetokeep=20   # 20 because all the patterns have a len<20. Could be higher.
-			i += lendataloaded
-		except Exception as exc:
-			if lendataloaded%512>0:
-				raise Exception("SPOD error 1: %d, %d"%(lendataloaded, i-len(datakept)))
-			os.lseek(fd, lendataloaded, os.SEEK_CUR)
-			print str(exc)
-			i += lendataloaded
-			continue
-	os.close(fd)
+    tzero=time.time()
+    sizetokeep=0
+    BlocksToInspect=dict(map(lambda x:[x,[]], patternlist))
+    syst=systype()
+    lendataloaded=None
+    writeProgressEvery=100*Mo
+    while i < int(size) and (lendataloaded!=0 or lendataloaded==None):
+        if int(i/writeProgressEvery)!=int((i+inc)/writeProgressEvery):
+            print "%.2f Go read"%(i/1e9)
+        try:
+            datakept=data[-sizetokeep:]
+            data = datakept+os.read(fd, inc)
+            lendataloaded = len(data)-len(datakept)   #should be inc
+            for text in patternlist:
+                if text in data:
+                    BlocksToInspect[text].append([i-len(datakept), data, len(datakept)])
+                    pass
+            sizetokeep=20   # 20 because all the patterns have a len<20. Could be higher.
+            i += lendataloaded
+        except Exception as exc:
+            if lendataloaded%512>0:
+                raise Exception("SPOD error 1: %d, %d"%(lendataloaded, i-len(datakept)))
+            os.lseek(fd, lendataloaded, os.SEEK_CUR)
+            print str(exc)
+            i += lendataloaded
+            continue
+    os.close(fd)
 
-	AllOffsets=dict(map(lambda x:[x,[]], patternlist))
-	for text,blocks in BlocksToInspect.items():
-		for offset,data,ldk in blocks:  #ldk = len(datakept)
-			offsetslist=[offset+m.start() for m in re.finditer(text, data)]
-			AllOffsets[text].extend(offsetslist)
+    AllOffsets=dict(map(lambda x:[x,[]], patternlist))
+    for text,blocks in BlocksToInspect.items():
+        for offset,data,ldk in blocks:  #ldk = len(datakept)
+            offsetslist=[offset+m.start() for m in re.finditer(text, data)]
+            AllOffsets[text].extend(offsetslist)
 
-	AllOffsets['PRFdevice']=device
-	AllOffsets['PRFdt']=time.time()-tzero
-	AllOffsets['PRFsize']=i
-	return AllOffsets
+    AllOffsets['PRFdevice']=device
+    AllOffsets['PRFdt']=time.time()-tzero
+    AllOffsets['PRFsize']=i
+    return AllOffsets
 
 def multiextract(s, ll):
-	r=[]
-	cursor=0
-	for length in ll:
-		r.append(s[cursor:cursor+length])
-		cursor+=length
-	if s[cursor:]!='':
-		r.append(s[cursor:])
-	return r
+    r=[]
+    cursor=0
+    for length in ll:
+        r.append(s[cursor:cursor+length])
+        cursor+=length
+    if s[cursor:]!='':
+        r.append(s[cursor:])
+    return r
 
 class RecovCkey(object):
-	def __init__(self, epk, pk):
-		self.encrypted_pk=epk
-		self.public_key=pk
-		self.mkey=None
-		self.privkey=None
+    def __init__(self, epk, pk):
+        self.encrypted_pk=epk
+        self.public_key=pk
+        self.mkey=None
+        self.privkey=None
 
 
 class RecovMkey(object):
-	def __init__(self, ekey, salt, nditer, ndmethod, nid):
-		self.encrypted_key=ekey
-		self.salt=salt
-		self.iterations=nditer
-		self.method=ndmethod
-		self.id=nid
+    def __init__(self, ekey, salt, nditer, ndmethod, nid):
+        self.encrypted_key=ekey
+        self.salt=salt
+        self.iterations=nditer
+        self.method=ndmethod
+        self.id=nid
 
 def readpartfile(fd, offset, length):   #make everything 512*n because of windows...
-	rest=offset%512
-	new_offset=offset-rest
-	big_length=512*(int((length+rest-1)/512)+1)
-	os.lseek(fd, new_offset, os.SEEK_SET)
-	d=os.read(fd, big_length)
-	return d[rest:rest+length]
+    rest=offset%512
+    new_offset=offset-rest
+    big_length=512*(int((length+rest-1)/512)+1)
+    os.lseek(fd, new_offset, os.SEEK_SET)
+    d=os.read(fd, big_length)
+    return d[rest:rest+length]
 
 def recov_ckey(fd, offset):
-	d=readpartfile(fd, offset-49, 122)
-	me=multiextract(d, [1,48,4,4,1])
+    d=readpartfile(fd, offset-49, 122)
+    me=multiextract(d, [1,48,4,4,1])
 
-	checks=[]
-	checks.append([0, '30'])
-	checks.append([3, '636b6579'])
-	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
-		return None
+    checks=[]
+    checks.append([0, '30'])
+    checks.append([3, '636b6579'])
+    if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+        return None
 
-	return me
+    return me
 
 def recov_mkey(fd, offset):
-	d=readpartfile(fd, offset-72, 84)
-	me=multiextract(d, [4,48,1,8,4,4,1,2,8,4])
+    d=readpartfile(fd, offset-72, 84)
+    me=multiextract(d, [4,48,1,8,4,4,1,2,8,4])
 
-	checks=[]
-	checks.append([0, '43000130'])
-	checks.append([2, '08'])
-	checks.append([6, '00'])
-	checks.append([8, '090001046d6b6579'])
-	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
-		return None
+    checks=[]
+    checks.append([0, '43000130'])
+    checks.append([2, '08'])
+    checks.append([6, '00'])
+    checks.append([8, '090001046d6b6579'])
+    if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+        return None
 
-	return me
+    return me
 
 def recov_uckey(fd, offset):
-	checks=[]
+    checks=[]
 
-	d=readpartfile(fd, offset-217, 223)
-	if d[-7]=='\x26':
-		me=multiextract(d, [2,1,4,1,32,141,33,2,1,6])
+    d=readpartfile(fd, offset-217, 223)
+    if d[-7]=='\x26':
+        me=multiextract(d, [2,1,4,1,32,141,33,2,1,6])
 
-		checks.append([0, '3081'])
-		checks.append([2, '02010104'])
-	elif d[-7]=='\x46':
-		d=readpartfile(fd, offset-282, 286)
+        checks.append([0, '3081'])
+        checks.append([2, '02010104'])
+    elif d[-7]=='\x46':
+        d=readpartfile(fd, offset-282, 286)
 
-		me=multiextract(d, [2,1,4,1,32,173,65,1,2,5])
+        me=multiextract(d, [2,1,4,1,32,173,65,1,2,5])
 
-		checks.append([0, '8201'])
-		checks.append([2, '02010104'])
-		checks.append([-1, '460001036b'])
-	else:
-		return None
+        checks.append([0, '8201'])
+        checks.append([2, '02010104'])
+        checks.append([-1, '460001036b'])
+    else:
+        return None
 
 
-	if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
-		return None
+    if sum(map(lambda x:int(me[x[0]]!=x[1].decode('hex')), checks)):  #number of false statements
+        return None
 
-	return me
+    return me
 
 def starts_with(s, b):
-	return len(s)>=len(b) and s[:len(b)]==b
+    return len(s)>=len(b) and s[:len(b)]==b
 
 
 def recov(device, passes, size=102400, inc=10240, outputdir='.'):
-	if inc%512>0:
-		inc-=inc%512   #inc must be 512*n on Windows... Don't ask me why...
+    if inc%512>0:
+        inc-=inc%512   #inc must be 512*n on Windows... Don't ask me why...
 
-	nameToDBName={'mkey':'\x09\x00\x01\x04mkey','ckey':'\x27\x00\x01\x04ckey','key':'\x00\x01\x03key',}
-
-
-	if not starts_with(device, 'PartialRecoveryFile:'):
-		r=search_patterns_on_disk(device, size, inc, map(lambda x:nameToDBName[x], ['mkey', 'ckey', 'key']))
-		f=open(outputdir+'/pywallet_partial_recovery_%d.dat'%ts(), 'w')
-		f.write(str(r))
-		f.close()
-		print "\nRead %.1f Go in %.1f minutes\n"%(r['PRFsize']/1e9, r['PRFdt']/60.0)
-	else:
-		prf=device[20:]
-		f=open(prf, 'r')
-		content=f.read()
-		f.close()
-		cmd=("z = "+content+"")
-		exec cmd in locals()
-		r=z
-		device=r['PRFdevice']
-		print "\nLoaded %.1f Go from %s\n"%(r['PRFsize']/1e9, device)
+    nameToDBName={'mkey':'\x09\x00\x01\x04mkey','ckey':'\x27\x00\x01\x04ckey','key':'\x00\x01\x03key',}
 
 
-	try:
-		otype=os.O_RDONLY|os.O_BINARY
-	except:
-		otype=os.O_RDONLY
-	fd = os.open(device, otype)
+    if not starts_with(device, 'PartialRecoveryFile:'):
+        r=search_patterns_on_disk(device, size, inc, map(lambda x:nameToDBName[x], ['mkey', 'ckey', 'key']))
+        f=open(outputdir+'/pywallet_partial_recovery_%d.dat'%ts(), 'w')
+        f.write(str(r))
+        f.close()
+        print "\nRead %.1f Go in %.1f minutes\n"%(r['PRFsize']/1e9, r['PRFdt']/60.0)
+    else:
+        prf=device[20:]
+        f=open(prf, 'r')
+        content=f.read()
+        f.close()
+        cmd=("z = "+content+"")
+        exec cmd in locals()
+        r=z
+        device=r['PRFdevice']
+        print "\nLoaded %.1f Go from %s\n"%(r['PRFsize']/1e9, device)
 
 
-	mkeys=[]
-	crypters=[]
-	syst=systype()
-	for offset in r[nameToDBName['mkey']]:
-		s=recov_mkey(fd, offset)
-		if s==None:
-			continue
-		newmkey=RecovMkey(s[1],s[3],int(s[5][::-1].encode('hex'), 16),int(s[4][::-1].encode('hex'), 16),int(s[-1][::-1].encode('hex'), 16))
-		mkeys.append([offset,newmkey])
-
-	print "Found", len(mkeys), 'possible wallets'
+    try:
+        otype=os.O_RDONLY|os.O_BINARY
+    except:
+        otype=os.O_RDONLY
+    fd = os.open(device, otype)
 
 
+    mkeys=[]
+    crypters=[]
+    syst=systype()
+    for offset in r[nameToDBName['mkey']]:
+        s=recov_mkey(fd, offset)
+        if s==None:
+            continue
+        newmkey=RecovMkey(s[1],s[3],int(s[5][::-1].encode('hex'), 16),int(s[4][::-1].encode('hex'), 16),int(s[-1][::-1].encode('hex'), 16))
+        mkeys.append([offset,newmkey])
+
+    print "Found", len(mkeys), 'possible wallets'
 
 
-	ckeys=[]
-	for offset in r[nameToDBName['ckey']]:
-		s=recov_ckey(fd, offset)
-		if s==None:
-			continue
-		newckey=RecovCkey(s[1], s[5][:int(s[4].encode('hex'),16)])
-		ckeys.append([offset,newckey])
-	print "Found", len(ckeys), 'possible encrypted keys'
 
 
-	uckeys=[]
-	for offset in r[nameToDBName['key']]:
-		s=recov_uckey(fd, offset)
-		if s==None:
-			continue
-		uckeys.append(s[4])
-	print "Found", len(uckeys), 'possible unencrypted keys'
+    ckeys=[]
+    for offset in r[nameToDBName['ckey']]:
+        s=recov_ckey(fd, offset)
+        if s==None:
+            continue
+        newckey=RecovCkey(s[1], s[5][:int(s[4].encode('hex'),16)])
+        ckeys.append([offset,newckey])
+    print "Found", len(ckeys), 'possible encrypted keys'
 
 
-	os.close(fd)
+    uckeys=[]
+    for offset in r[nameToDBName['key']]:
+        s=recov_uckey(fd, offset)
+        if s==None:
+            continue
+        uckeys.append(s[4])
+    print "Found", len(uckeys), 'possible unencrypted keys'
 
 
-	list_of_possible_keys_per_master_key=dict(map(lambda x:[x[1],[]], mkeys))
-	for cko,ck in ckeys:
-		tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
-		tl=sorted(tl, key=lambda x:x[0])
-		list_of_possible_keys_per_master_key[tl[0][2]].append(ck)
-
-	cpt=0
-	mki=1
-	tzero=time.time()
-	if len(passes)==0:
-		if len(ckeys)>0:
-			print "Can't decrypt them as you didn't provide any passphrase."
-	else:
-		for mko,mk in mkeys:
-			list_of_possible_keys=list_of_possible_keys_per_master_key[mk]
-			sys.stdout.write( "\nPossible wallet #"+str(mki))
-			sys.stdout.flush()
-			for ppi,pp in enumerate(passes):
-				sys.stdout.write( "\n    with passphrase #"+str(ppi+1)+"  ")
-				sys.stdout.flush()
-				failures_in_a_row=0
-#				print "SKFP params:", pp, mk.salt, mk.iterations, mk.method
-				res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
-				if res == 0:
-					print "Unsupported derivation method"
-					sys.exit(1)
-				masterkey = crypter.Decrypt(mk.encrypted_key)
-				crypter.SetKey(masterkey)
-				for ck in list_of_possible_keys:
-					if cpt%10==9 and failures_in_a_row==0:
-						sys.stdout.write('.')
-						sys.stdout.flush()
-					if failures_in_a_row>5:
-						break
-					crypter.SetIV(Hash(ck.public_key))
-					secret = crypter.Decrypt(ck.encrypted_pk)
-					compressed = ck.public_key[0] != '\04'
+    os.close(fd)
 
 
-					pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
-					if ck.public_key != GetPubKey(pkey, compressed):
-						failures_in_a_row+=1
-					else:
-						failures_in_a_row=0
-						ck.mkey=mk
-						ck.privkey=secret
-					cpt+=1
-			mki+=1
-		print "\n"
-		tone=time.time()
-		try:
-			calcspeed=1.0*cpt/(tone-tzero)*60  #calc/min
-		except:
-			calcspeed=1.0
-		if calcspeed==0:
-			calcspeed=1.0
+    list_of_possible_keys_per_master_key=dict(map(lambda x:[x[1],[]], mkeys))
+    for cko,ck in ckeys:
+        tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
+        tl=sorted(tl, key=lambda x:x[0])
+        list_of_possible_keys_per_master_key[tl[0][2]].append(ck)
 
-		ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
-		refused_to_test_all_pps=True
-		if len(ckeys_not_decrypted)==0:
-			print "All the found encrypted private keys have been decrypted."
-			return map(lambda x:x[1].privkey, ckeys)
-		else:
-			print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
-			print "Trying all the remaining possibilities (%d) might take up to %d minutes."%(len(ckeys_not_decrypted)*len(passes)*len(mkeys),int(len(ckeys_not_decrypted)*len(passes)*len(mkeys)/calcspeed))
-			cont=raw_input("Do you want to test them? (y/n): ")
-			while len(cont)==0:
-                                cont=raw_input("Do you want to test them? (y/n): ")
-                        if cont[0]=='y':
-                                refused_to_test_all_pps=False
-                                cpt=0
-                                for dist,mko,mk in tl:
-                                        for ppi,pp in enumerate(passes):
-                                                res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
-                                                if res == 0:
-                                                        logging.error("Unsupported derivation method")
-                                                        sys.exit(1)
-                                                masterkey = crypter.Decrypt(mk.encrypted_key)
-                                                crypter.SetKey(masterkey)
-                                                for cko,ck in ckeys_not_decrypted:
-                                                        tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
-                                                        tl=sorted(tl, key=lambda x:x[0])
-                                                        if mk==tl[0][2]:
-                                                                continue         #because already tested
-                                                        crypter.SetIV(Hash(ck.public_key))
-                                                        secret = crypter.Decrypt(ck.encrypted_pk)
-                                                        compressed = ck.public_key[0] != '\04'
+    cpt=0
+    mki=1
+    tzero=time.time()
+    if len(passes)==0:
+        if len(ckeys)>0:
+            print "Can't decrypt them as you didn't provide any passphrase."
+    else:
+        for mko,mk in mkeys:
+            list_of_possible_keys=list_of_possible_keys_per_master_key[mk]
+            sys.stdout.write( "\nPossible wallet #"+str(mki))
+            sys.stdout.flush()
+            for ppi,pp in enumerate(passes):
+                sys.stdout.write( "\n    with passphrase #"+str(ppi+1)+"  ")
+                sys.stdout.flush()
+                failures_in_a_row=0
+#               print "SKFP params:", pp, mk.salt, mk.iterations, mk.method
+                res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
+                if res == 0:
+                    print "Unsupported derivation method"
+                    sys.exit(1)
+                masterkey = crypter.Decrypt(mk.encrypted_key)
+                crypter.SetKey(masterkey)
+                for ck in list_of_possible_keys:
+                    if cpt%10==9 and failures_in_a_row==0:
+                        sys.stdout.write('.')
+                        sys.stdout.flush()
+                    if failures_in_a_row>5:
+                        break
+                    crypter.SetIV(Hash(ck.public_key))
+                    secret = crypter.Decrypt(ck.encrypted_pk)
+                    compressed = ck.public_key[0] != '\04'
 
 
-                                                        pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
-                                                        if ck.public_key == GetPubKey(pkey, compressed):
-                                                                ck.mkey=mk
-                                                                ck.privkey=secret
-                                                        cpt+=1
+                    pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
+                    if ck.public_key != GetPubKey(pkey, compressed):
+                        failures_in_a_row+=1
+                    else:
+                        failures_in_a_row=0
+                        ck.mkey=mk
+                        ck.privkey=secret
+                    cpt+=1
+            mki+=1
+        print "\n"
+        tone=time.time()
+        try:
+            calcspeed=1.0*cpt/(tone-tzero)*60  #calc/min
+        except:
+            calcspeed=1.0
+        if calcspeed==0:
+            calcspeed=1.0
 
-		print
-		ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
-		if len(ckeys_not_decrypted)==0:
-			print "All the found encrypted private keys have been finally decrypted."
-		elif not refused_to_test_all_pps:
-			print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
-			print "Try another password, check the size of your partition or seek help"
+        ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
+        refused_to_test_all_pps=True
+        if len(ckeys_not_decrypted)==0:
+            print "All the found encrypted private keys have been decrypted."
+            return map(lambda x:x[1].privkey, ckeys)
+        else:
+            print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
+            print "Trying all the remaining possibilities (%d) might take up to %d minutes."%(len(ckeys_not_decrypted)*len(passes)*len(mkeys),int(len(ckeys_not_decrypted)*len(passes)*len(mkeys)/calcspeed))
+            cont=raw_input("Do you want to test them? (y/n): ")
+            while len(cont)==0:
+                cont=raw_input("Do you want to test them? (y/n): ")
+                if cont[0]=='y':
+                    refused_to_test_all_pps=False
+                    cpt=0
+                    for dist,mko,mk in tl:
+                        for ppi,pp in enumerate(passes):
+                            res = crypter.SetKeyFromPassphrase(pp, mk.salt, mk.iterations, mk.method)
+                            if res == 0:
+                                logging.error("Unsupported derivation method")
+                                sys.exit(1)
+                            masterkey = crypter.Decrypt(mk.encrypted_key)
+                            crypter.SetKey(masterkey)
+                            for cko,ck in ckeys_not_decrypted:
+                                tl=map(lambda x:[abs(x[0]-cko)]+x, mkeys)
+                                tl=sorted(tl, key=lambda x:x[0])
+                                if mk==tl[0][2]:
+                                    continue         #because already tested
+                                crypter.SetIV(Hash(ck.public_key))
+                                secret = crypter.Decrypt(ck.encrypted_pk)
+                                compressed = ck.public_key[0] != '\04'
 
 
-	uncrypted_ckeys=filter(lambda x:x!=None, map(lambda x:x[1].privkey, ckeys))
-	uckeys.extend(uncrypted_ckeys)
+                                pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
+                                if ck.public_key == GetPubKey(pkey, compressed):
+                                    ck.mkey=mk
+                                    ck.privkey=secret
+                                cpt+=1
 
-	return uckeys
+        print
+        ckeys_not_decrypted=filter(lambda x:x[1].privkey==None, ckeys)
+        if len(ckeys_not_decrypted)==0:
+            print "All the found encrypted private keys have been finally decrypted."
+        elif not refused_to_test_all_pps:
+            print "Private keys not decrypted: %d"%len(ckeys_not_decrypted)
+            print "Try another password, check the size of your partition or seek help"
+
+
+    uncrypted_ckeys=filter(lambda x:x!=None, map(lambda x:x[1].privkey, ckeys))
+    uckeys.extend(uncrypted_ckeys)
+
+    return uckeys
 
 
 
 
 def ts():
-	return int(time.mktime(datetime.now().timetuple()))
+    return int(time.mktime(datetime.now().timetuple()))
 
 def check_postkeys(key, postkeys):
-	for i in postkeys:
-		if key[:len(i)] == i:
-			return True
-	return False
+    for i in postkeys:
+        if key[:len(i)] == i:
+            return True
+    return False
 
 def one_element_in(a, string):
-	for i in a:
-		if i in string:
-			return True
-	return False
+    for i in a:
+        if i in string:
+            return True
+    return False
 
 def first_read(device, size, prekeys, inc=10000):
-	t0 = ts()-1
-	try:
-		fd = os.open (device, os.O_RDONLY)
-	except:
-		print("Can't open %s, check the path or try as root"%device)
-		exit(0)
-	prekey = prekeys[0]
-	data = ""
-	i = 0
-	data = os.read (fd, i)
-	before_contained_key = False
-	contains_key = False
-	ranges = []
+    t0 = ts()-1
+    try:
+        fd = os.open (device, os.O_RDONLY)
+    except:
+        print("Can't open %s, check the path or try as root"%device)
+        exit(0)
+    prekey = prekeys[0]
+    data = ""
+    i = 0
+    data = os.read (fd, i)
+    before_contained_key = False
+    contains_key = False
+    ranges = []
 
-	while i < int(size):
-		if i%(10*Mio) > 0 and i%(10*Mio) <= inc:
-			print("\n%.2f/%.2f Go"%(i/1e9, size/1e9))
-			t = ts()
-			speed = i/(t-t0)
-			ETAts = size/speed + t0
-			d = datetime.fromtimestamp(ETAts)
-			print(d.strftime("   ETA: %H:%M:%S"))
+    while i < int(size):
+        if i%(10*Mio) > 0 and i%(10*Mio) <= inc:
+            print("\n%.2f/%.2f Go"%(i/1e9, size/1e9))
+            t = ts()
+            speed = i/(t-t0)
+            ETAts = size/speed + t0
+            d = datetime.fromtimestamp(ETAts)
+            print(d.strftime("   ETA: %H:%M:%S"))
 
-		try:
-			data = os.read (fd, inc)
-		except Exception as exc:
-			os.lseek(fd, inc, os.SEEK_CUR)
-			print str(exc)
-			i += inc
-			continue
+        try:
+            data = os.read (fd, inc)
+        except Exception as exc:
+            os.lseek(fd, inc, os.SEEK_CUR)
+            print str(exc)
+            i += inc
+            continue
 
-		contains_key = one_element_in(prekeys, data)
+        contains_key = one_element_in(prekeys, data)
 
-		if not before_contained_key and contains_key:
-			ranges.append(i)
+        if not before_contained_key and contains_key:
+            ranges.append(i)
 
-		if before_contained_key and not contains_key:
-			ranges.append(i)
+        if before_contained_key and not contains_key:
+            ranges.append(i)
 
-		before_contained_key = contains_key
+        before_contained_key = contains_key
 
-		i += inc
+        i += inc
 
-	os.close (fd)
-	return ranges
+    os.close (fd)
+    return ranges
 
 def shrink_intervals(device, ranges, prekeys, inc=1000):
-	prekey = prekeys[0]
-	nranges = []
-	fd = os.open (device, os.O_RDONLY)
-	for j in range(len(ranges)/2):
-		before_contained_key = False
-		contains_key = False
-		bi = ranges[2*j]
-		bf = ranges[2*j+1]
+    prekey = prekeys[0]
+    nranges = []
+    fd = os.open (device, os.O_RDONLY)
+    for j in range(len(ranges)/2):
+        before_contained_key = False
+        contains_key = False
+        bi = ranges[2*j]
+        bf = ranges[2*j+1]
 
-		mini_blocks = []
-		k = bi
-		while k <= bf + len(prekey) + 1:
-			mini_blocks.append(k)
-			k += inc
-			mini_blocks.append(k)
+        mini_blocks = []
+        k = bi
+        while k <= bf + len(prekey) + 1:
+            mini_blocks.append(k)
+            k += inc
+            mini_blocks.append(k)
 
-		for k in range(len(mini_blocks)/2):
-			mini_blocks[2*k] -= len(prekey) +1
-			mini_blocks[2*k+1] += len(prekey) +1
+        for k in range(len(mini_blocks)/2):
+            mini_blocks[2*k] -= len(prekey) +1
+            mini_blocks[2*k+1] += len(prekey) +1
 
 
-			bi = mini_blocks[2*k]
-			bf = mini_blocks[2*k+1]
+            bi = mini_blocks[2*k]
+            bf = mini_blocks[2*k+1]
 
-			os.lseek(fd, bi, 0)
+            os.lseek(fd, bi, 0)
 
-			data = os.read(fd, bf-bi+1)
-			contains_key = one_element_in(prekeys, data)
+            data = os.read(fd, bf-bi+1)
+            contains_key = one_element_in(prekeys, data)
 
-			if not before_contained_key and contains_key:
-				nranges.append(bi)
+            if not before_contained_key and contains_key:
+                nranges.append(bi)
 
-			if before_contained_key and not contains_key:
-				nranges.append(bi+len(prekey) +1+len(prekey) +1)
+            if before_contained_key and not contains_key:
+                nranges.append(bi+len(prekey) +1+len(prekey) +1)
 
-			before_contained_key = contains_key
+            before_contained_key = contains_key
 
-	os.close (fd)
+    os.close (fd)
 
-	return nranges
+    return nranges
 
 def find_offsets(device, ranges, prekeys):
-	prekey = prekeys[0]
-	list_offsets = []
-	to_read = 0
-	fd = os.open (device, os.O_RDONLY)
-	for i in range(len(ranges)/2):
-		bi = ranges[2*i]-len(prekey)-1
-		os.lseek(fd, bi, 0)
-		bf = ranges[2*i+1]+len(prekey)+1
-		to_read += bf-bi+1
-		buf = ""
-		for j in range(len(prekey)):
-			buf += "\x00"
-		curs = bi
+    prekey = prekeys[0]
+    list_offsets = []
+    to_read = 0
+    fd = os.open (device, os.O_RDONLY)
+    for i in range(len(ranges)/2):
+        bi = ranges[2*i]-len(prekey)-1
+        os.lseek(fd, bi, 0)
+        bf = ranges[2*i+1]+len(prekey)+1
+        to_read += bf-bi+1
+        buf = ""
+        for j in range(len(prekey)):
+            buf += "\x00"
+        curs = bi
 
-		while curs <= bf:
-			data = os.read(fd, 1)
-			buf = buf[1:] + data
-			if buf in prekeys:
-				list_offsets.append(curs)
-			curs += 1
+        while curs <= bf:
+            data = os.read(fd, 1)
+            buf = buf[1:] + data
+            if buf in prekeys:
+                list_offsets.append(curs)
+            curs += 1
 
-	os.close (fd)
+    os.close (fd)
 
-	return [to_read, list_offsets]
+    return [to_read, list_offsets]
 
 def read_keys(device, list_offsets):
-	found_hexkeys = []
-	fd = os.open (device, os.O_RDONLY)
-	for offset in list_offsets:
-		os.lseek(fd, offset+1, 0)
-		data = os.read(fd, 40)
-		hexkey = data[1:33].encode('hex')
-		after_key = data[33:39].encode('hex')
-		if hexkey not in found_hexkeys and check_postkeys(after_key.decode('hex'), postkeys):
-			found_hexkeys.append(hexkey)
+    found_hexkeys = []
+    fd = os.open (device, os.O_RDONLY)
+    for offset in list_offsets:
+        os.lseek(fd, offset+1, 0)
+        data = os.read(fd, 40)
+        hexkey = data[1:33].encode('hex')
+        after_key = data[33:39].encode('hex')
+        if hexkey not in found_hexkeys and check_postkeys(after_key.decode('hex'), postkeys):
+            found_hexkeys.append(hexkey)
 
-	os.close (fd)
+    os.close (fd)
 
-	return found_hexkeys
+    return found_hexkeys
 
 def read_device_size(size):
-	if size[-2] == 'i':
-		unit = size[-3:]
-		value = float(size[:-3])
-	else:
-		unit = size[-2:]
-		value = float(size[:-2])
-	exec 'unit = %s' % unit
-	return int(value * unit)
+    if size[-2] == 'i':
+        unit = size[-3:]
+        value = float(size[:-3])
+    else:
+        unit = size[-2:]
+        value = float(size[:-2])
+    exec 'unit = %s' % unit
+    return int(value * unit)
 
 def md5_2(a):
-	return hashlib.md5(a).digest()
+    return hashlib.md5(a).digest()
 
 def md5_file(nf):
   try:
-	fichier = file(nf, 'r').read()
-	return md5_2(fichier)
+    fichier = file(nf, 'r').read()
+    return md5_2(fichier)
   except:
-	return 'zz'
+    return 'zz'
 
 def md5_onlinefile(add):
-	page = urllib.urlopen(add).read()
-	return md5_2(page)
+    page = urllib.urlopen(add).read()
+    return md5_2(page)
 
 
 class KEY:
 
-	 def __init__ (self):
-		  self.prikey = None
-		  self.pubkey = None
+     def __init__ (self):
+          self.prikey = None
+          self.pubkey = None
 
-	 def generate (self, secret=None):
-		  if secret:
-				exp = int ('0x' + secret.encode ('hex'), 16)
-				self.prikey = ecdsa.SigningKey.from_secret_exponent (exp, curve=secp256k1)
-		  else:
-				self.prikey = ecdsa.SigningKey.generate (curve=secp256k1)
-		  self.pubkey = self.prikey.get_verifying_key()
-		  return self.prikey.to_der()
+     def generate (self, secret=None):
+          if secret:
+                exp = int ('0x' + secret.encode ('hex'), 16)
+                self.prikey = ecdsa.SigningKey.from_secret_exponent (exp, curve=secp256k1)
+          else:
+                self.prikey = ecdsa.SigningKey.generate (curve=secp256k1)
+          self.pubkey = self.prikey.get_verifying_key()
+          return self.prikey.to_der()
 
-	 def set_privkey (self, key):
-		  if len(key) == 279:
-				seq1, rest = der.remove_sequence (key)
-				integer, rest = der.remove_integer (seq1)
-				octet_str, rest = der.remove_octet_string (rest)
-				tag1, cons1, rest, = der.remove_constructed (rest)
-				tag2, cons2, rest, = der.remove_constructed (rest)
-				point_str, rest = der.remove_bitstring (cons2)
-				self.prikey = ecdsa.SigningKey.from_string(octet_str, curve=secp256k1)
-		  else:
-				self.prikey = ecdsa.SigningKey.from_der (key)
+     def set_privkey (self, key):
+          if len(key) == 279:
+                seq1, rest = der.remove_sequence (key)
+                integer, rest = der.remove_integer (seq1)
+                octet_str, rest = der.remove_octet_string (rest)
+                tag1, cons1, rest, = der.remove_constructed (rest)
+                tag2, cons2, rest, = der.remove_constructed (rest)
+                point_str, rest = der.remove_bitstring (cons2)
+                self.prikey = ecdsa.SigningKey.from_string(octet_str, curve=secp256k1)
+          else:
+                self.prikey = ecdsa.SigningKey.from_der (key)
 
-	 def set_pubkey (self, key):
-		  key = key[1:]
-		  self.pubkey = ecdsa.VerifyingKey.from_string (key, curve=secp256k1)
+     def set_pubkey (self, key):
+          key = key[1:]
+          self.pubkey = ecdsa.VerifyingKey.from_string (key, curve=secp256k1)
 
-	 def get_privkey (self):
-		  _p = self.prikey.curve.curve.p ()
-		  _r = self.prikey.curve.generator.order ()
-		  _Gx = self.prikey.curve.generator.x ()
-		  _Gy = self.prikey.curve.generator.y ()
-		  encoded_oid2 = der.encode_oid (*(1, 2, 840, 10045, 1, 1))
-		  encoded_gxgy = "\x04" + ("%64x" % _Gx).decode('hex') + ("%64x" % _Gy).decode('hex')
-		  param_sequence = der.encode_sequence (
-				ecdsa.der.encode_integer(1),
-					der.encode_sequence (
-					encoded_oid2,
-					der.encode_integer (_p),
-				),
-				der.encode_sequence (
-					der.encode_octet_string("\x00"),
-					der.encode_octet_string("\x07"),
-				),
-				der.encode_octet_string (encoded_gxgy),
-				der.encode_integer (_r),
-				der.encode_integer (1),
-		  );
-		  encoded_vk = "\x00\x04" + self.pubkey.to_string ()
-		  return der.encode_sequence (
-				der.encode_integer (1),
-				der.encode_octet_string (self.prikey.to_string ()),
-				der.encode_constructed (0, param_sequence),
-				der.encode_constructed (1, der.encode_bitstring (encoded_vk)),
-		  )
+     def get_privkey (self):
+          _p = self.prikey.curve.curve.p ()
+          _r = self.prikey.curve.generator.order ()
+          _Gx = self.prikey.curve.generator.x ()
+          _Gy = self.prikey.curve.generator.y ()
+          encoded_oid2 = der.encode_oid (*(1, 2, 840, 10045, 1, 1))
+          encoded_gxgy = "\x04" + ("%64x" % _Gx).decode('hex') + ("%64x" % _Gy).decode('hex')
+          param_sequence = der.encode_sequence (
+                ecdsa.der.encode_integer(1),
+                    der.encode_sequence (
+                    encoded_oid2,
+                    der.encode_integer (_p),
+                ),
+                der.encode_sequence (
+                    der.encode_octet_string("\x00"),
+                    der.encode_octet_string("\x07"),
+                ),
+                der.encode_octet_string (encoded_gxgy),
+                der.encode_integer (_r),
+                der.encode_integer (1),
+          );
+          encoded_vk = "\x00\x04" + self.pubkey.to_string ()
+          return der.encode_sequence (
+                der.encode_integer (1),
+                der.encode_octet_string (self.prikey.to_string ()),
+                der.encode_constructed (0, param_sequence),
+                der.encode_constructed (1, der.encode_bitstring (encoded_vk)),
+          )
 
-	 def get_pubkey (self):
-		  return "\x04" + self.pubkey.to_string()
+     def get_pubkey (self):
+          return "\x04" + self.pubkey.to_string()
 
-	 def sign (self, hash):
-		  sig = self.prikey.sign_digest (hash, sigencode=ecdsa.util.sigencode_der)
-		  return sig.encode('hex')
+     def sign (self, hash):
+          sig = self.prikey.sign_digest (hash, sigencode=ecdsa.util.sigencode_der)
+          return sig.encode('hex')
 
-	 def verify (self, hash, sig):
-		  return self.pubkey.verify_digest (sig, hash, sigdecode=ecdsa.util.sigdecode_der)
+     def verify (self, hash, sig):
+          return self.pubkey.verify_digest (sig, hash, sigdecode=ecdsa.util.sigdecode_der)
 
 def bool_to_int(b):
-	if b:
-		return 1
-	return 0
+    if b:
+        return 1
+    return 0
 
 class BCDataStream(object):
-	def __init__(self):
-		self.input = None
-		self.read_cursor = 0
+    def __init__(self):
+        self.input = None
+        self.read_cursor = 0
 
-	def clear(self):
-		self.input = None
-		self.read_cursor = 0
+    def clear(self):
+        self.input = None
+        self.read_cursor = 0
 
-	def write(self, bytes):	# Initialize with string of bytes
-		if self.input is None:
-			self.input = bytes
-		else:
-			self.input += bytes
+    def write(self, bytes): # Initialize with string of bytes
+        if self.input is None:
+            self.input = bytes
+        else:
+            self.input += bytes
 
-	def map_file(self, file, start):	# Initialize with bytes from file
-		self.input = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
-		self.read_cursor = start
-	def seek_file(self, position):
-		self.read_cursor = position
-	def close_file(self):
-		self.input.close()
+    def map_file(self, file, start):    # Initialize with bytes from file
+        self.input = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
+        self.read_cursor = start
+    def seek_file(self, position):
+        self.read_cursor = position
+    def close_file(self):
+        self.input.close()
 
-	def read_string(self):
-		# Strings are encoded depending on length:
-		# 0 to 252 :	1-byte-length followed by bytes (if any)
-		# 253 to 65,535 : byte'253' 2-byte-length followed by bytes
-		# 65,536 to 4,294,967,295 : byte '254' 4-byte-length followed by bytes
-		# ... and the Bitcoin client is coded to understand:
-		# greater than 4,294,967,295 : byte '255' 8-byte-length followed by bytes of string
-		# ... but I don't think it actually handles any strings that big.
-		if self.input is None:
-			raise SerializationError("call write(bytes) before trying to deserialize")
+    def read_string(self):
+        # Strings are encoded depending on length:
+        # 0 to 252 :    1-byte-length followed by bytes (if any)
+        # 253 to 65,535 : byte'253' 2-byte-length followed by bytes
+        # 65,536 to 4,294,967,295 : byte '254' 4-byte-length followed by bytes
+        # ... and the Bitcoin client is coded to understand:
+        # greater than 4,294,967,295 : byte '255' 8-byte-length followed by bytes of string
+        # ... but I don't think it actually handles any strings that big.
+        if self.input is None:
+            raise SerializationError("call write(bytes) before trying to deserialize")
 
-		try:
-			length = self.read_compact_size()
-		except IndexError:
-			raise SerializationError("attempt to read past end of buffer")
+        try:
+            length = self.read_compact_size()
+        except IndexError:
+            raise SerializationError("attempt to read past end of buffer")
 
-		return self.read_bytes(length)
+        return self.read_bytes(length)
 
-	def write_string(self, string):
-		# Length-encoded as with read-string
-		self.write_compact_size(len(string))
-		self.write(string)
+    def write_string(self, string):
+        # Length-encoded as with read-string
+        self.write_compact_size(len(string))
+        self.write(string)
 
-	def read_bytes(self, length):
-		try:
-			result = self.input[self.read_cursor:self.read_cursor+length]
-			self.read_cursor += length
-			return result
-		except IndexError:
-			raise SerializationError("attempt to read past end of buffer")
+    def read_bytes(self, length):
+        try:
+            result = self.input[self.read_cursor:self.read_cursor+length]
+            self.read_cursor += length
+            return result
+        except IndexError:
+            raise SerializationError("attempt to read past end of buffer")
 
-		return ''
+        return ''
 
-	def read_boolean(self): return self.read_bytes(1)[0] != chr(0)
-	def read_int16(self): return self._read_num('<h')
-	def read_uint16(self): return self._read_num('<H')
-	def read_int32(self): return self._read_num('<i')
-	def read_uint32(self): return self._read_num('<I')
-	def read_int64(self): return self._read_num('<q')
-	def read_uint64(self): return self._read_num('<Q')
+    def read_boolean(self): return self.read_bytes(1)[0] != chr(0)
+    def read_int16(self): return self._read_num('<h')
+    def read_uint16(self): return self._read_num('<H')
+    def read_int32(self): return self._read_num('<i')
+    def read_uint32(self): return self._read_num('<I')
+    def read_int64(self): return self._read_num('<q')
+    def read_uint64(self): return self._read_num('<Q')
 
-	def write_boolean(self, val): return self.write(chr(bool_to_int(val)))
-	def write_int16(self, val): return self._write_num('<h', val)
-	def write_uint16(self, val): return self._write_num('<H', val)
-	def write_int32(self, val): return self._write_num('<i', val)
-	def write_uint32(self, val): return self._write_num('<I', val)
-	def write_int64(self, val): return self._write_num('<q', val)
-	def write_uint64(self, val): return self._write_num('<Q', val)
+    def write_boolean(self, val): return self.write(chr(bool_to_int(val)))
+    def write_int16(self, val): return self._write_num('<h', val)
+    def write_uint16(self, val): return self._write_num('<H', val)
+    def write_int32(self, val): return self._write_num('<i', val)
+    def write_uint32(self, val): return self._write_num('<I', val)
+    def write_int64(self, val): return self._write_num('<q', val)
+    def write_uint64(self, val): return self._write_num('<Q', val)
 
-	def read_compact_size(self):
-		size = ord(self.input[self.read_cursor])
-		self.read_cursor += 1
-		if size == 253:
-			size = self._read_num('<H')
-		elif size == 254:
-			size = self._read_num('<I')
-		elif size == 255:
-			size = self._read_num('<Q')
-		return size
+    def read_compact_size(self):
+        size = ord(self.input[self.read_cursor])
+        self.read_cursor += 1
+        if size == 253:
+            size = self._read_num('<H')
+        elif size == 254:
+            size = self._read_num('<I')
+        elif size == 255:
+            size = self._read_num('<Q')
+        return size
 
-	def write_compact_size(self, size):
-		if size < 0:
-			raise SerializationError("attempt to write size < 0")
-		elif size < 253:
-			 self.write(chr(size))
-		elif size < 2**16:
-			self.write('\xfd')
-			self._write_num('<H', size)
-		elif size < 2**32:
-			self.write('\xfe')
-			self._write_num('<I', size)
-		elif size < 2**64:
-			self.write('\xff')
-			self._write_num('<Q', size)
+    def write_compact_size(self, size):
+        if size < 0:
+            raise SerializationError("attempt to write size < 0")
+        elif size < 253:
+             self.write(chr(size))
+        elif size < 2**16:
+            self.write('\xfd')
+            self._write_num('<H', size)
+        elif size < 2**32:
+            self.write('\xfe')
+            self._write_num('<I', size)
+        elif size < 2**64:
+            self.write('\xff')
+            self._write_num('<Q', size)
 
-	def _read_num(self, format):
-		(i,) = struct.unpack_from(format, self.input, self.read_cursor)
-		self.read_cursor += struct.calcsize(format)
-		return i
+    def _read_num(self, format):
+        (i,) = struct.unpack_from(format, self.input, self.read_cursor)
+        self.read_cursor += struct.calcsize(format)
+        return i
 
-	def _write_num(self, format, num):
-		s = struct.pack(format, num)
-		self.write(s)
+    def _write_num(self, format, num):
+        s = struct.pack(format, num)
+        self.write(s)
 
 def open_wallet(db_env, walletfile, writable=False):
-	db = DB(db_env)
-	if writable:
-		DB_TYPEOPEN = DB_CREATE
-	else:
-		DB_TYPEOPEN = DB_RDONLY
-	flags = DB_THREAD | DB_TYPEOPEN
-	try:
-		r = db.open(walletfile, "main", DB_BTREE, flags)
-	except DBError:
-		r = True
+    db = DB(db_env)
+    if writable:
+        DB_TYPEOPEN = DB_CREATE
+    else:
+        DB_TYPEOPEN = DB_RDONLY
+    flags = DB_THREAD | DB_TYPEOPEN
+    try:
+        r = db.open(walletfile, "main", DB_BTREE, flags)
+    except DBError as ex:
+        print("")
+        print(ex)
+        r = True
 
-	if r is not None:
-		logging.error("Couldn't open wallet.dat/main. Try quitting Bitcoin and running this again.")
-		sys.exit(1)
+    if r is not None:
+        logging.error("Couldn't open wallet.dat/main. Try quitting Bitcoin and running this again.")
+        sys.exit(1)
 
-	return db
+    return db
 
 def inversetxid(txid):
-	if len(txid) is not 64:
-		print("Bad txid")
-		return "CORRUPTEDTXID:"+txid
-#		exit(0)
-	new_txid = ""
-	for i in range(32):
-		new_txid += txid[62-2*i];
-		new_txid += txid[62-2*i+1];
-	return new_txid
+    if len(txid) is not 64:
+        print("Bad txid")
+        return "CORRUPTEDTXID:"+txid
+#       exit(0)
+    new_txid = ""
+    for i in range(32):
+        new_txid += txid[62-2*i];
+        new_txid += txid[62-2*i+1];
+    return new_txid
 
 def parse_wallet(db, item_callback):
-	kds = BCDataStream()
-	vds = BCDataStream()
+    kds = BCDataStream()
+    vds = BCDataStream()
 
 
-	def parse_TxIn(vds):
-		d = {}
-		d['prevout_hash'] = vds.read_bytes(32).encode('hex')
-		d['prevout_n'] = vds.read_uint32()
-		d['scriptSig'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
-		d['sequence'] = vds.read_uint32()
-		return d
+    def parse_TxIn(vds):
+        d = {}
+        d['prevout_hash'] = vds.read_bytes(32).encode('hex')
+        d['prevout_n'] = vds.read_uint32()
+        d['scriptSig'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
+        d['sequence'] = vds.read_uint32()
+        return d
 
 
-	def parse_TxOut(vds):
-		d = {}
-		d['value'] = vds.read_int64()/1e8
-		d['scriptPubKey'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
-		return d
+    def parse_TxOut(vds):
+        d = {}
+        d['value'] = vds.read_int64()/1e8
+        d['scriptPubKey'] = vds.read_bytes(vds.read_compact_size()).encode('hex')
+        return d
 
 
-	for (key, value) in db.items():
-		d = { }
+    for (key, value) in db.items():
+        d = { }
 
-		kds.clear(); kds.write(key)
-		vds.clear(); vds.write(value)
+        kds.clear(); kds.write(key)
+        vds.clear(); vds.write(value)
 
-		type = kds.read_string()
+        type = kds.read_string()
 
-		d["__key__"] = key
-		d["__value__"] = value
-		d["__type__"] = type
+        d["__key__"] = key
+        d["__value__"] = value
+        d["__type__"] = type
 
-		try:
-			if type == "tx":
-				d["tx_id"] = inversetxid(kds.read_bytes(32).encode('hex_codec'))
-				start = vds.read_cursor
-				d['version'] = vds.read_int32()
-				n_vin = vds.read_compact_size()
-				d['txIn'] = []
-				for i in xrange(n_vin):
-					d['txIn'].append(parse_TxIn(vds))
-				n_vout = vds.read_compact_size()
-				d['txOut'] = []
-				for i in xrange(n_vout):
-					d['txOut'].append(parse_TxOut(vds))
-				d['lockTime'] = vds.read_uint32()
-				d['tx'] = vds.input[start:vds.read_cursor].encode('hex_codec')
-				d['txv'] = value.encode('hex_codec')
-				d['txk'] = key.encode('hex_codec')
-			elif type == "name":
-				d['hash'] = kds.read_string()
-				d['name'] = vds.read_string()
-			elif type == "version":
-				d['version'] = vds.read_uint32()
-			elif type == "minversion":
-				d['minversion'] = vds.read_uint32()
-			elif type == "setting":
-				d['setting'] = kds.read_string()
-				d['value'] = parse_setting(d['setting'], vds)
-			elif type == "key":
-				d['public_key'] = kds.read_bytes(kds.read_compact_size())
-				d['private_key'] = vds.read_bytes(vds.read_compact_size())
-			elif type == "wkey":
-				d['public_key'] = kds.read_bytes(kds.read_compact_size())
-				d['private_key'] = vds.read_bytes(vds.read_compact_size())
-				d['created'] = vds.read_int64()
-				d['expires'] = vds.read_int64()
-				d['comment'] = vds.read_string()
-			elif type == "defaultkey":
-				d['key'] = vds.read_bytes(vds.read_compact_size())
-			elif type == "pool":
-				d['n'] = kds.read_int64()
-				d['nVersion'] = vds.read_int32()
-				d['nTime'] = vds.read_int64()
-				d['public_key'] = vds.read_bytes(vds.read_compact_size())
-			elif type == "acc":
-				d['account'] = kds.read_string()
-				d['nVersion'] = vds.read_int32()
-				d['public_key'] = vds.read_bytes(vds.read_compact_size())
-			elif type == "acentry":
-				d['account'] = kds.read_string()
-				d['n'] = kds.read_uint64()
-				d['nVersion'] = vds.read_int32()
-				d['nCreditDebit'] = vds.read_int64()
-				d['nTime'] = vds.read_int64()
-				d['otherAccount'] = vds.read_string()
-				d['comment'] = vds.read_string()
-			elif type == "bestblock":
-				d['nVersion'] = vds.read_int32()
-				d.update(parse_BlockLocator(vds))
-			elif type == "ckey":
-				d['public_key'] = kds.read_bytes(kds.read_compact_size())
-				d['encrypted_private_key'] = vds.read_bytes(vds.read_compact_size())
-			elif type == "mkey":
-				d['nID'] = kds.read_uint32()
-				d['encrypted_key'] = vds.read_string()
-				d['salt'] = vds.read_string()
-				d['nDerivationMethod'] = vds.read_uint32()
-				d['nDerivationIterations'] = vds.read_uint32()
-				d['otherParams'] = vds.read_string()
+        try:
+            if type == "tx":
+                d["tx_id"] = inversetxid(kds.read_bytes(32).encode('hex_codec'))
+                start = vds.read_cursor
+                d['version'] = vds.read_int32()
+                n_vin = vds.read_compact_size()
+                d['txIn'] = []
+                for i in xrange(n_vin):
+                    d['txIn'].append(parse_TxIn(vds))
+                n_vout = vds.read_compact_size()
+                d['txOut'] = []
+                for i in xrange(n_vout):
+                    d['txOut'].append(parse_TxOut(vds))
+                d['lockTime'] = vds.read_uint32()
+                d['tx'] = vds.input[start:vds.read_cursor].encode('hex_codec')
+                d['txv'] = value.encode('hex_codec')
+                d['txk'] = key.encode('hex_codec')
+            elif type == "name":
+                d['hash'] = kds.read_string()
+                d['name'] = vds.read_string()
+            elif type == "version":
+                d['version'] = vds.read_uint32()
+            elif type == "minversion":
+                d['minversion'] = vds.read_uint32()
+            elif type == "setting":
+                d['setting'] = kds.read_string()
+                d['value'] = parse_setting(d['setting'], vds)
+            elif type == "key":
+                d['public_key'] = kds.read_bytes(kds.read_compact_size())
+                d['private_key'] = vds.read_bytes(vds.read_compact_size())
+            elif type == "wkey":
+                d['public_key'] = kds.read_bytes(kds.read_compact_size())
+                d['private_key'] = vds.read_bytes(vds.read_compact_size())
+                d['created'] = vds.read_int64()
+                d['expires'] = vds.read_int64()
+                d['comment'] = vds.read_string()
+            elif type == "defaultkey":
+                d['key'] = vds.read_bytes(vds.read_compact_size())
+            elif type == "pool":
+                d['n'] = kds.read_int64()
+                d['nVersion'] = vds.read_int32()
+                d['nTime'] = vds.read_int64()
+                d['public_key'] = vds.read_bytes(vds.read_compact_size())
+            elif type == "acc":
+                d['account'] = kds.read_string()
+                d['nVersion'] = vds.read_int32()
+                d['public_key'] = vds.read_bytes(vds.read_compact_size())
+            elif type == "acentry":
+                d['account'] = kds.read_string()
+                d['n'] = kds.read_uint64()
+                d['nVersion'] = vds.read_int32()
+                d['nCreditDebit'] = vds.read_int64()
+                d['nTime'] = vds.read_int64()
+                d['otherAccount'] = vds.read_string()
+                d['comment'] = vds.read_string()
+            elif type == "bestblock":
+                d['nVersion'] = vds.read_int32()
+                d.update(parse_BlockLocator(vds))
+            elif type == "ckey":
+                d['public_key'] = kds.read_bytes(kds.read_compact_size())
+                d['encrypted_private_key'] = vds.read_bytes(vds.read_compact_size())
+            elif type == "mkey":
+                d['nID'] = kds.read_uint32()
+                d['encrypted_key'] = vds.read_string()
+                d['salt'] = vds.read_string()
+                d['nDerivationMethod'] = vds.read_uint32()
+                d['nDerivationIterations'] = vds.read_uint32()
+                d['otherParams'] = vds.read_string()
 
-			item_callback(type, d)
+            item_callback(type, d)
 
-		except Exception, e:
-			traceback.print_exc()
-			print("ERROR parsing wallet.dat, type %s" % type)
-			print("key data: %s"%key)
-			print("key data in hex: %s"%key.encode('hex_codec'))
-			print("value data in hex: %s"%value.encode('hex_codec'))
-			sys.exit(1)
+        except Exception, e:
+            traceback.print_exc()
+            print("ERROR parsing wallet.dat, type %s" % type)
+            print("key data: %s"%key)
+            print("key data in hex: %s"%key.encode('hex_codec'))
+            print("value data in hex: %s"%value.encode('hex_codec'))
+            sys.exit(1)
 
 def delete_from_wallet(db_env, walletfile, typedel, kd):
-	db = open_wallet(db_env, walletfile, True)
-	kds = BCDataStream()
-	vds = BCDataStream()
+    db = open_wallet(db_env, walletfile, True)
+    kds = BCDataStream()
+    vds = BCDataStream()
 
-	deleted_items = 0
+    deleted_items = 0
 
-	if not isinstance(kd, list):
-		kd=[kd]
+    if not isinstance(kd, list):
+        kd=[kd]
 
-	if typedel=='tx' and kd!=['all']:
-		for keydel in kd:
-			db.delete('\x02\x74\x78'+keydel.decode('hex')[::-1])
-			deleted_items+=1
+    if typedel=='tx' and kd!=['all']:
+        for keydel in kd:
+            db.delete('\x02\x74\x78'+keydel.decode('hex')[::-1])
+            deleted_items+=1
 
-	else:
-		for i,keydel in enumerate(kd):
-			for (key, value) in db.items():
-				kds.clear(); kds.write(key)
-				vds.clear(); vds.write(value)
-				type = kds.read_string()
+    else:
+        for i,keydel in enumerate(kd):
+            for (key, value) in db.items():
+                kds.clear(); kds.write(key)
+                vds.clear(); vds.write(value)
+                type = kds.read_string()
 
-				if typedel == "tx" and type == "tx":
-					db.delete(key)
-					deleted_items+=1
-				elif typedel == "key":
-					if type == "key" or type == "ckey":
-						if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
-							db.delete(key)
-							deleted_items+=1
-					elif type == "pool":
-						vds.read_int32()
-						vds.read_int64()
-						if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
-							db.delete(key)
-							deleted_items+=1
-					elif type == "name":
-						if keydel == kds.read_string():
-							db.delete(key)
-							deleted_items+=1
+                if typedel == "tx" and type == "tx":
+                    db.delete(key)
+                    deleted_items+=1
+                elif typedel == "key":
+                    if type == "key" or type == "ckey":
+                        if keydel == public_key_to_bc_address(kds.read_bytes(kds.read_compact_size())):
+                            db.delete(key)
+                            deleted_items+=1
+                    elif type == "pool":
+                        vds.read_int32()
+                        vds.read_int64()
+                        if keydel == public_key_to_bc_address(vds.read_bytes(vds.read_compact_size())):
+                            db.delete(key)
+                            deleted_items+=1
+                    elif type == "name":
+                        if keydel == kds.read_string():
+                            db.delete(key)
+                            deleted_items+=1
 
 
-	db.close()
-	return deleted_items
+    db.close()
+    return deleted_items
 
 def merge_keys_lists(la, lb):
-	lr={}
-	llr=[]
-	for k in la:
-		lr[k[0]]=k[1]
+    lr={}
+    llr=[]
+    for k in la:
+        lr[k[0]]=k[1]
 
-	for k in lb:
-		if k[0] in lr.keys():
-			lr[k[0]]=lr[k[0]]+" / "+k[1]
-		else:
-			lr[k[0]]=k[1]
+    for k in lb:
+        if k[0] in lr.keys():
+            lr[k[0]]=lr[k[0]]+" / "+k[1]
+        else:
+            lr[k[0]]=k[1]
 
-	for k,j in lr.items():
-		llr.append([k,j])
+    for k,j in lr.items():
+        llr.append([k,j])
 
-	return llr
+    return llr
 
 def merge_wallets(wadir, wa, wbdir, wb, wrdir, wr, passphrase_a, passphrase_b, passphrase_r):
-	global passphrase
-	passphrase_LAST=passphrase
+    global passphrase
+    passphrase_LAST=passphrase
 
-	#Read Wallet 1
-	passphrase=passphrase_a
-	dba_env = create_env(wadir)
-	crypted_a = read_wallet(json_db, dba_env, wa, True, True, "", None)['crypted']
+    #Read Wallet 1
+    passphrase=passphrase_a
+    dba_env = create_env(wadir)
+    crypted_a = read_wallet(json_db, dba_env, wa, True, True, "", None)['crypted']
 
-	list_keys_a=[]
-	for i in json_db['keys']:
-		try:
-			label=i['label']
-		except:
-			label="#Reserve"
-		try:
-			list_keys_a.append([i['secret'], label])
-		except:
-			pass
+    list_keys_a=[]
+    for i in json_db['keys']:
+        try:
+            label=i['label']
+        except:
+            label="#Reserve"
+        try:
+            list_keys_a.append([i['secret'], label])
+        except:
+            pass
 
-	if len(list_keys_a)==0:
-		return [False, "Something went wrong with the first wallet."]
-
-
-	#Read Wallet 2
-	passphrase=passphrase_b
-	dbb_env = create_env(wbdir)
-	crypted_b = read_wallet(json_db, dbb_env, wb, True, True, "", None)['crypted']
-
-	list_keys_b=[]
-	for i in json_db['keys']:
-		try:
-			label=i['label']
-		except:
-			label="#Reserve"
-		try:
-			list_keys_b.append([i['secret'], label])
-		except:
-			pass
-	if len(list_keys_b)==0:
-		return [False, "Something went wrong with the second wallet."]
-
-	m=merge_keys_lists(list_keys_a,list_keys_b)
+    if len(list_keys_a)==0:
+        return [False, "Something went wrong with the first wallet."]
 
 
-	#Create new wallet
-	dbr_env = create_env(wrdir)
-	create_new_wallet(dbr_env, wr, 80100)
+    #Read Wallet 2
+    passphrase=passphrase_b
+    dbb_env = create_env(wbdir)
+    crypted_b = read_wallet(json_db, dbb_env, wb, True, True, "", None)['crypted']
 
-	dbr = open_wallet(dbr_env, wr, True)
-	update_wallet(dbr, 'minversion', { 'minversion' : 60000})
+    list_keys_b=[]
+    for i in json_db['keys']:
+        try:
+            label=i['label']
+        except:
+            label="#Reserve"
+        try:
+            list_keys_b.append([i['secret'], label])
+        except:
+            pass
+    if len(list_keys_b)==0:
+        return [False, "Something went wrong with the second wallet."]
 
-
-	if len(passphrase_r)>0:
-		NPP_salt=os.urandom(8)
-		NPP_rounds=int(50000+random.random()*20000)
-		NPP_method=0
-		NPP_MK=os.urandom(32)
-
-		crypter.SetKeyFromPassphrase(passphrase_r, NPP_salt, NPP_rounds, NPP_method)
-		NPP_EMK = crypter.Encrypt(NPP_MK)
-
-		update_wallet(dbr, 'mkey', {
-		    "encrypted_key": NPP_EMK,
-			'nDerivationIterations' : NPP_rounds,
-			'nDerivationMethod' : NPP_method,
-			'nID' : 1,
-			'otherParams' : ''.decode('hex'),
-		    "salt": NPP_salt
-		})
+    m=merge_keys_lists(list_keys_a,list_keys_b)
 
 
-	dbr.close()
+    #Create new wallet
+    dbr_env = create_env(wrdir)
+    create_new_wallet(dbr_env, wr, 80100)
 
-	t='\n'.join(map(lambda x:';'.join(x), m))
-	passphrase=passphrase_r
+    dbr = open_wallet(dbr_env, wr, True)
+    update_wallet(dbr, 'minversion', { 'minversion' : 60000})
 
-	global global_merging_message
 
-	global_merging_message=["Merging...","Merging..."]
-	thread.start_new_thread(import_csv_keys, ("\x00"+t, wrdir, wr,))
-	t=""
+    if len(passphrase_r)>0:
+        NPP_salt=os.urandom(8)
+        NPP_rounds=int(50000+random.random()*20000)
+        NPP_method=0
+        NPP_MK=os.urandom(32)
 
-	passphrase=passphrase_LAST
+        crypter.SetKeyFromPassphrase(passphrase_r, NPP_salt, NPP_rounds, NPP_method)
+        NPP_EMK = crypter.Encrypt(NPP_MK)
 
-	return [True]
+        update_wallet(dbr, 'mkey', {
+            "encrypted_key": NPP_EMK,
+            'nDerivationIterations' : NPP_rounds,
+            'nDerivationMethod' : NPP_method,
+            'nID' : 1,
+            'otherParams' : ''.decode('hex'),
+            "salt": NPP_salt
+        })
+
+
+    dbr.close()
+
+    t='\n'.join(map(lambda x:';'.join(x), m))
+    passphrase=passphrase_r
+
+    global global_merging_message
+
+    global_merging_message=["Merging...","Merging..."]
+    thread.start_new_thread(import_csv_keys, ("\x00"+t, wrdir, wr,))
+    t=""
+
+    passphrase=passphrase_LAST
+
+    return [True]
 
 def random_string(l, alph="0123456789abcdef"):
-	r=""
-	la=len(alph)
-	for i in range(l):
-		r+=alph[int(la*(random.random()))]
-	return r
+    r=""
+    la=len(alph)
+    for i in range(l):
+        r+=alph[int(la*(random.random()))]
+    return r
 
 def update_wallet(db, types, datas, paramsAreLists=False):
-	"""Write a single item to the wallet.
-	db must be open with writable=True.
-	type and data are the type code and data dictionary as parse_wallet would
-	give to item_callback.
-	data's __key__, __value__ and __type__ are ignored; only the primary data
-	fields are used.
-	"""
+    """Write a single item to the wallet.
+    db must be open with writable=True.
+    type and data are the type code and data dictionary as parse_wallet would
+    give to item_callback.
+    data's __key__, __value__ and __type__ are ignored; only the primary data
+    fields are used.
+    """
 
-	if not paramsAreLists:
-		types=[types]
-		datas=[datas]
+    if not paramsAreLists:
+        types=[types]
+        datas=[datas]
 
-	if len(types)!=len(datas):
-		raise Exception("UpdateWallet: sizes are different")
+    if len(types)!=len(datas):
+        raise Exception("UpdateWallet: sizes are different")
 
-	for it,type in enumerate(types):
-		data=datas[it]
+    for it,type in enumerate(types):
+        data=datas[it]
 
-		d = data
-		kds = BCDataStream()
-		vds = BCDataStream()
+        d = data
+        kds = BCDataStream()
+        vds = BCDataStream()
 
-		# Write the type code to the key
-		kds.write_string(type)
-		vds.write("")						 # Ensure there is something
+        # Write the type code to the key
+        kds.write_string(type)
+        vds.write("")                        # Ensure there is something
 
-		try:
-			if type == "tx":
-	#			raise NotImplementedError("Writing items of type 'tx'")
-				kds.write(d['txi'][6:].decode('hex_codec'))
-				vds.write(d['txv'].decode('hex_codec'))
-			elif type == "name":
-				kds.write_string(d['hash'])
-				vds.write_string(d['name'])
-			elif type == "version":
-				vds.write_uint32(d['version'])
-			elif type == "minversion":
-				vds.write_uint32(d['minversion'])
-			elif type == "setting":
-				raise NotImplementedError("Writing items of type 'setting'")
-				kds.write_string(d['setting'])
-				#d['value'] = parse_setting(d['setting'], vds)
-			elif type == "key":
-				kds.write_string(d['public_key'])
-				vds.write_string(d['private_key'])
-			elif type == "wkey":
-				kds.write_string(d['public_key'])
-				vds.write_string(d['private_key'])
-				vds.write_int64(d['created'])
-				vds.write_int64(d['expires'])
-				vds.write_string(d['comment'])
-			elif type == "defaultkey":
-				vds.write_string(d['key'])
-			elif type == "pool":
-				kds.write_int64(d['n'])
-				vds.write_int32(d['nVersion'])
-				vds.write_int64(d['nTime'])
-				vds.write_string(d['public_key'])
-			elif type == "acc":
-				kds.write_string(d['account'])
-				vds.write_int32(d['nVersion'])
-				vds.write_string(d['public_key'])
-			elif type == "acentry":
-				kds.write_string(d['account'])
-				kds.write_uint64(d['n'])
-				vds.write_int32(d['nVersion'])
-				vds.write_int64(d['nCreditDebit'])
-				vds.write_int64(d['nTime'])
-				vds.write_string(d['otherAccount'])
-				vds.write_string(d['comment'])
-			elif type == "bestblock":
-				vds.write_int32(d['nVersion'])
-				vds.write_compact_size(len(d['hashes']))
-				for h in d['hashes']:
-					vds.write(h)
-			elif type == "ckey":
-				kds.write_string(d['public_key'])
-				vds.write_string(d['encrypted_private_key'])
-			elif type == "mkey":
-				kds.write_uint32(d['nID'])
-				vds.write_string(d['encrypted_key'])
-				vds.write_string(d['salt'])
-				vds.write_uint32(d['nDerivationMethod'])
-				vds.write_uint32(d['nDerivationIterations'])
-				vds.write_string(d['otherParams'])
+        try:
+            if type == "tx":
+    #           raise NotImplementedError("Writing items of type 'tx'")
+                kds.write(d['txi'][6:].decode('hex_codec'))
+                vds.write(d['txv'].decode('hex_codec'))
+            elif type == "name":
+                kds.write_string(d['hash'])
+                vds.write_string(d['name'])
+            elif type == "version":
+                vds.write_uint32(d['version'])
+            elif type == "minversion":
+                vds.write_uint32(d['minversion'])
+            elif type == "setting":
+                raise NotImplementedError("Writing items of type 'setting'")
+                kds.write_string(d['setting'])
+                #d['value'] = parse_setting(d['setting'], vds)
+            elif type == "key":
+                kds.write_string(d['public_key'])
+                vds.write_string(d['private_key'])
+            elif type == "wkey":
+                kds.write_string(d['public_key'])
+                vds.write_string(d['private_key'])
+                vds.write_int64(d['created'])
+                vds.write_int64(d['expires'])
+                vds.write_string(d['comment'])
+            elif type == "defaultkey":
+                vds.write_string(d['key'])
+            elif type == "pool":
+                kds.write_int64(d['n'])
+                vds.write_int32(d['nVersion'])
+                vds.write_int64(d['nTime'])
+                vds.write_string(d['public_key'])
+            elif type == "acc":
+                kds.write_string(d['account'])
+                vds.write_int32(d['nVersion'])
+                vds.write_string(d['public_key'])
+            elif type == "acentry":
+                kds.write_string(d['account'])
+                kds.write_uint64(d['n'])
+                vds.write_int32(d['nVersion'])
+                vds.write_int64(d['nCreditDebit'])
+                vds.write_int64(d['nTime'])
+                vds.write_string(d['otherAccount'])
+                vds.write_string(d['comment'])
+            elif type == "bestblock":
+                vds.write_int32(d['nVersion'])
+                vds.write_compact_size(len(d['hashes']))
+                for h in d['hashes']:
+                    vds.write(h)
+            elif type == "ckey":
+                kds.write_string(d['public_key'])
+                vds.write_string(d['encrypted_private_key'])
+            elif type == "mkey":
+                kds.write_uint32(d['nID'])
+                vds.write_string(d['encrypted_key'])
+                vds.write_string(d['salt'])
+                vds.write_uint32(d['nDerivationMethod'])
+                vds.write_uint32(d['nDerivationIterations'])
+                vds.write_string(d['otherParams'])
 
-			else:
-				print "Unknown key type: "+type
+            else:
+                print "Unknown key type: "+type
 
-			# Write the key/value pair to the database
-			db.put(kds.input, vds.input)
+            # Write the key/value pair to the database
+            db.put(kds.input, vds.input)
 
-		except Exception, e:
-			print("ERROR writing to wallet.dat, type %s"%type)
-			print("data dictionary: %r"%data)
-			traceback.print_exc()
+        except Exception, e:
+            print("ERROR writing to wallet.dat, type %s"%type)
+            print("data dictionary: %r"%data)
+            traceback.print_exc()
 
 def create_new_wallet(db_env, walletfile, version):
-	db_out = DB(db_env)
+    db_out = DB(db_env)
 
-	try:
-		r = db_out.open(walletfile, "main", DB_BTREE, DB_CREATE)
-	except DBError:
-		r = True
+    try:
+        r = db_out.open(walletfile, "main", DB_BTREE, DB_CREATE)
+    except DBError:
+        r = True
 
-	if r is not None:
-		logging.error("Couldn't open %s."%walletfile)
-		sys.exit(1)
+    if r is not None:
+        logging.error("Couldn't open %s."%walletfile)
+        sys.exit(1)
 
-	db_out.put("0776657273696f6e".decode('hex'), ("%08x"%version).decode('hex')[::-1])
+    db_out.put("0776657273696f6e".decode('hex'), ("%08x"%version).decode('hex')[::-1])
 
-	db_out.close()
+    db_out.close()
 
 
 def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
-	db = open_wallet(db_env, walletfile)
+    db = open_wallet(db_env, walletfile)
 
-	db_out = DB(db_env)
-	try:
-		r = db_out.open(destFileName, "main", DB_BTREE, DB_CREATE)
-	except DBError:
-		r = True
+    db_out = DB(db_env)
+    try:
+        r = db_out.open(destFileName, "main", DB_BTREE, DB_CREATE)
+    except DBError:
+        r = True
 
-	if r is not None:
-		logging.error("Couldn't open %s."%destFileName)
-		sys.exit(1)
+    if r is not None:
+        logging.error("Couldn't open %s."%destFileName)
+        sys.exit(1)
 
-	def item_callback(type, d):
-		if (pre_put_callback is None or pre_put_callback(type, d)):
-			db_out.put(d["__key__"], d["__value__"])
+    def item_callback(type, d):
+        if (pre_put_callback is None or pre_put_callback(type, d)):
+            db_out.put(d["__key__"], d["__value__"])
 
-	parse_wallet(db, item_callback)
-	db_out.close()
-	db.close()
+    parse_wallet(db, item_callback)
+    db_out.close()
+    db.close()
 
 # end of bitcointools wallet.dat handling code
 
@@ -2428,307 +2436,307 @@ def rewrite_wallet(db_env, walletfile, destFileName, pre_put_callback=None):
 
 addr_to_keys={}
 def read_wallet(json_db, db_env, walletfile, print_wallet, print_wallet_transactions, transaction_filter, include_balance, vers=-1, FillPool=False):
-	global passphrase, addr_to_keys
-	crypted=False
+    global passphrase, addr_to_keys
+    crypted=False
 
-	private_keys = []
-	private_hex_keys = []
+    private_keys = []
+    private_hex_keys = []
 
-	if vers > -1:
-		global addrtype
-		oldaddrtype = addrtype
-		addrtype = vers
+    if vers > -1:
+        global addrtype
+        oldaddrtype = addrtype
+        addrtype = vers
 
-	db = open_wallet(db_env, walletfile, writable=FillPool)
+    db = open_wallet(db_env, walletfile, writable=FillPool)
 
-	json_db['keys'] = []
-	json_db['pool'] = []
-	json_db['tx'] = []
-	json_db['names'] = {}
-	json_db['ckey'] = []
-	json_db['mkey'] = {}
+    json_db['keys'] = []
+    json_db['pool'] = []
+    json_db['tx'] = []
+    json_db['names'] = {}
+    json_db['ckey'] = []
+    json_db['mkey'] = {}
 
-	def item_callback(type, d):
-		if type == "tx":
-			json_db['tx'].append({"tx_id" : d['tx_id'], "txin" : d['txIn'], "txout" : d['txOut'], "tx_v" : d['txv'], "tx_k" : d['txk']})
+    def item_callback(type, d):
+        if type == "tx":
+            json_db['tx'].append({"tx_id" : d['tx_id'], "txin" : d['txIn'], "txout" : d['txOut'], "tx_v" : d['txv'], "tx_k" : d['txk']})
 
-		elif type == "name":
-			json_db['names'][d['hash']] = d['name']
+        elif type == "name":
+            json_db['names'][d['hash']] = d['name']
 
-		elif type == "version":
-			json_db['version'] = d['version']
+        elif type == "version":
+            json_db['version'] = d['version']
 
-		elif type == "minversion":
-			json_db['minversion'] = d['minversion']
+        elif type == "minversion":
+            json_db['minversion'] = d['minversion']
 
-		elif type == "setting":
-			if not json_db.has_key('settings'): json_db['settings'] = {}
-			json_db["settings"][d['setting']] = d['value']
+        elif type == "setting":
+            if not json_db.has_key('settings'): json_db['settings'] = {}
+            json_db["settings"][d['setting']] = d['value']
 
-		elif type == "defaultkey":
-			json_db['defaultkey'] = public_key_to_bc_address(d['key'])
+        elif type == "defaultkey":
+            json_db['defaultkey'] = public_key_to_bc_address(d['key'])
 
-		elif type == "key":
-			addr = public_key_to_bc_address(d['public_key'])
-			compressed = d['public_key'][0] != '\04'
-			sec = SecretToASecret(PrivKeyToSecret(d['private_key']), compressed)
-			hexsec = ASecretToSecret(sec)[:32].encode('hex')
-			private_keys.append(sec)
-			addr_to_keys[addr]=[hexsec, d['public_key'].encode('hex')]
-			json_db['keys'].append({'addr' : addr, 'sec' : sec, 'hexsec' : hexsec, 'secret' : hexsec, 'pubkey':d['public_key'].encode('hex'), 'compressed':compressed, 'private':d['private_key'].encode('hex')})
+        elif type == "key":
+            addr = public_key_to_bc_address(d['public_key'])
+            compressed = d['public_key'][0] != '\04'
+            sec = SecretToASecret(PrivKeyToSecret(d['private_key']), compressed)
+            hexsec = ASecretToSecret(sec)[:32].encode('hex')
+            private_keys.append(sec)
+            addr_to_keys[addr]=[hexsec, d['public_key'].encode('hex')]
+            json_db['keys'].append({'addr' : addr, 'sec' : sec, 'hexsec' : hexsec, 'secret' : hexsec, 'pubkey':d['public_key'].encode('hex'), 'compressed':compressed, 'private':d['private_key'].encode('hex')})
 
-		elif type == "wkey":
-			if not json_db.has_key('wkey'): json_db['wkey'] = []
-			json_db['wkey']['created'] = d['created']
+        elif type == "wkey":
+            if not json_db.has_key('wkey'): json_db['wkey'] = []
+            json_db['wkey']['created'] = d['created']
 
-		elif type == "pool":
-			"""	d['n'] = kds.read_int64()
-				d['nVersion'] = vds.read_int32()
-				d['nTime'] = vds.read_int64()
-				d['public_key'] = vds.read_bytes(vds.read_compact_size())"""
-			try:
-				json_db['pool'].append( {'n': d['n'], 'addr': public_key_to_bc_address(d['public_key']), 'addr2': public_key_to_bc_address(d['public_key'].decode('hex')), 'addr3': public_key_to_bc_address(d['public_key'].encode('hex')), 'nTime' : d['nTime'], 'nVersion' : d['nVersion'], 'public_key_hex' : d['public_key'] } )
-			except:
-				json_db['pool'].append( {'n': d['n'], 'addr': public_key_to_bc_address(d['public_key']), 'nTime' : d['nTime'], 'nVersion' : d['nVersion'], 'public_key_hex' : d['public_key'].encode('hex') } )
+        elif type == "pool":
+            """ d['n'] = kds.read_int64()
+                d['nVersion'] = vds.read_int32()
+                d['nTime'] = vds.read_int64()
+                d['public_key'] = vds.read_bytes(vds.read_compact_size())"""
+            try:
+                json_db['pool'].append( {'n': d['n'], 'addr': public_key_to_bc_address(d['public_key']), 'addr2': public_key_to_bc_address(d['public_key'].decode('hex')), 'addr3': public_key_to_bc_address(d['public_key'].encode('hex')), 'nTime' : d['nTime'], 'nVersion' : d['nVersion'], 'public_key_hex' : d['public_key'] } )
+            except:
+                json_db['pool'].append( {'n': d['n'], 'addr': public_key_to_bc_address(d['public_key']), 'nTime' : d['nTime'], 'nVersion' : d['nVersion'], 'public_key_hex' : d['public_key'].encode('hex') } )
 
-		elif type == "acc":
-			json_db['acc'] = d['account']
-			print("Account %s (current key: %s)"%(d['account'], public_key_to_bc_address(d['public_key'])))
+        elif type == "acc":
+            json_db['acc'] = d['account']
+            print("Account %s (current key: %s)"%(d['account'], public_key_to_bc_address(d['public_key'])))
 
-		elif type == "acentry":
-			json_db['acentry'] = (d['account'], d['nCreditDebit'], d['otherAccount'], time.ctime(d['nTime']), d['n'], d['comment'])
+        elif type == "acentry":
+            json_db['acentry'] = (d['account'], d['nCreditDebit'], d['otherAccount'], time.ctime(d['nTime']), d['n'], d['comment'])
 
-		elif type == "bestblock":
-			json_db['bestblock'] = d['hashes'][0][::-1].encode('hex_codec')
+        elif type == "bestblock":
+            json_db['bestblock'] = d['hashes'][0][::-1].encode('hex_codec')
 
-		elif type == "ckey":
-			crypted=True
-			compressed = d['public_key'][0] != '\04'
-			json_db['keys'].append({ 'pubkey': d['public_key'].encode('hex'),'addr': public_key_to_bc_address(d['public_key']), 'encrypted_privkey':  d['encrypted_private_key'].encode('hex_codec'), 'compressed':compressed})
+        elif type == "ckey":
+            crypted=True
+            compressed = d['public_key'][0] != '\04'
+            json_db['keys'].append({ 'pubkey': d['public_key'].encode('hex'),'addr': public_key_to_bc_address(d['public_key']), 'encrypted_privkey':  d['encrypted_private_key'].encode('hex_codec'), 'compressed':compressed})
 
-		elif type == "mkey":
-			json_db['mkey']['nID'] = d['nID']
-			json_db['mkey']['encrypted_key'] = d['encrypted_key'].encode('hex_codec')
-			json_db['mkey']['salt'] = d['salt'].encode('hex_codec')
-			json_db['mkey']['nDerivationMethod'] = d['nDerivationMethod']
-			json_db['mkey']['nDerivationIterations'] = d['nDerivationIterations']
-			json_db['mkey']['otherParams'] = d['otherParams']
+        elif type == "mkey":
+            json_db['mkey']['nID'] = d['nID']
+            json_db['mkey']['encrypted_key'] = d['encrypted_key'].encode('hex_codec')
+            json_db['mkey']['salt'] = d['salt'].encode('hex_codec')
+            json_db['mkey']['nDerivationMethod'] = d['nDerivationMethod']
+            json_db['mkey']['nDerivationIterations'] = d['nDerivationIterations']
+            json_db['mkey']['otherParams'] = d['otherParams']
 
-			if passphrase:
-				res = crypter.SetKeyFromPassphrase(passphrase, d['salt'], d['nDerivationIterations'], d['nDerivationMethod'])
-				if res == 0:
-					logging.error("Unsupported derivation method")
-					sys.exit(1)
-				masterkey = crypter.Decrypt(d['encrypted_key'])
-				crypter.SetKey(masterkey)
+            if passphrase:
+                res = crypter.SetKeyFromPassphrase(passphrase, d['salt'], d['nDerivationIterations'], d['nDerivationMethod'])
+                if res == 0:
+                    logging.error("Unsupported derivation method")
+                    sys.exit(1)
+                masterkey = crypter.Decrypt(d['encrypted_key'])
+                crypter.SetKey(masterkey)
 
-		else:
-			json_db[type] = 'unsupported'
-			print "Wallet data not recognized: "+str(d)
+        else:
+            json_db[type] = 'unsupported'
+            print "Wallet data not recognized: "+str(d)
 
-	list_of_reserve_not_in_pool=[]
-	parse_wallet(db, item_callback)
-
-
-	nkeys = len(json_db['keys'])
-	i = 0
-	for k in json_db['keys']:
-		i+=1
-		addr = k['addr']
-		if include_balance:
-#			print("%3d/%d  %s  %s" % (i, nkeys, k["addr"], k["balance"]))
-			k["balance"] = balance(balance_site, k["addr"])
-#			print("  %s" % (i, nkeys, k["addr"], k["balance"]))
-
-		if addr in json_db['names'].keys():
-			k["label"] = json_db['names'][addr]
-			k["reserve"] = 0
-		else:
-			k["reserve"] = 1
-			list_of_reserve_not_in_pool.append(k['pubkey'])
+    list_of_reserve_not_in_pool=[]
+    parse_wallet(db, item_callback)
 
 
-	def rnip_callback(a):
-		list_of_reserve_not_in_pool.remove(a['public_key_hex'])
+    nkeys = len(json_db['keys'])
+    i = 0
+    for k in json_db['keys']:
+        i+=1
+        addr = k['addr']
+        if include_balance:
+#           print("%3d/%d  %s  %s" % (i, nkeys, k["addr"], k["balance"]))
+            k["balance"] = balance(balance_site, k["addr"])
+#           print("  %s" % (i, nkeys, k["addr"], k["balance"]))
 
-	if FillPool:
-		map(rnip_callback, json_db['pool'])
-
-		cpt=1
-		for p in list_of_reserve_not_in_pool:
-			update_wallet(db, 'pool', { 'public_key' : p.decode('hex'), 'n' : cpt, 'nTime' : ts(), 'nVersion':80100 })
-			cpt+=1
-
-
-
-	db.close()
-
-	crypted = 'salt' in json_db['mkey']
-
-	if not crypted:
-		print "The wallet is not encrypted"
-
-	if crypted and not passphrase:
-		print "The wallet is encrypted but no passphrase is used"
-
-	if crypted and passphrase:
-		check = True
-		ppcorrect=True
-		for k in json_db['keys']:
-		  if 'encrypted_privkey' in k:
-			ckey = k['encrypted_privkey'].decode('hex')
-			public_key = k['pubkey'].decode('hex')
-			crypter.SetIV(Hash(public_key))
-			secret = crypter.Decrypt(ckey)
-			compressed = public_key[0] != '\04'
+        if addr in json_db['names'].keys():
+            k["label"] = json_db['names'][addr]
+            k["reserve"] = 0
+        else:
+            k["reserve"] = 1
+            list_of_reserve_not_in_pool.append(k['pubkey'])
 
 
-			if check:
-				check = False
-				pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
-				if public_key != GetPubKey(pkey, compressed):
-					print "The wallet is encrypted and the passphrase is incorrect"
-					ppcorrect=False
-					break
+    def rnip_callback(a):
+        list_of_reserve_not_in_pool.remove(a['public_key_hex'])
 
-			sec = SecretToASecret(secret, compressed)
-			k['sec'] = sec
-			k['hexsec'] = secret[:32].encode('hex')
-			k['secret'] = secret.encode('hex')
-			k['compressed'] = compressed
-			addr_to_keys[k['addr']]=[sec, k['pubkey']]
-#			del(k['ckey'])
-#			del(k['secret'])
-#			del(k['pubkey'])
-			private_keys.append(sec)
-		if ppcorrect:
-			print "The wallet is encrypted and the passphrase is correct"
+    if FillPool:
+        map(rnip_callback, json_db['pool'])
 
-	for k in json_db['keys']:
-		if k['compressed'] and 'secret' in k:
-			k['secret']+="01"
+        cpt=1
+        for p in list_of_reserve_not_in_pool:
+            update_wallet(db, 'pool', { 'public_key' : p.decode('hex'), 'n' : cpt, 'nTime' : ts(), 'nVersion':80100 })
+            cpt+=1
 
-#	del(json_db['pool'])
-#	del(json_db['names'])
-	if vers > -1:
-		addrtype = oldaddrtype
 
-	return {'crypted':crypted}
+
+    db.close()
+
+    crypted = 'salt' in json_db['mkey']
+
+    if not crypted:
+        print "The wallet is not encrypted"
+
+    if crypted and not passphrase:
+        print "The wallet is encrypted but no passphrase is used"
+
+    if crypted and passphrase:
+        check = True
+        ppcorrect=True
+        for k in json_db['keys']:
+          if 'encrypted_privkey' in k:
+            ckey = k['encrypted_privkey'].decode('hex')
+            public_key = k['pubkey'].decode('hex')
+            crypter.SetIV(Hash(public_key))
+            secret = crypter.Decrypt(ckey)
+            compressed = public_key[0] != '\04'
+
+
+            if check:
+                check = False
+                pkey = EC_KEY(int('0x' + secret.encode('hex'), 16))
+                if public_key != GetPubKey(pkey, compressed):
+                    print "The wallet is encrypted and the passphrase is incorrect"
+                    ppcorrect=False
+                    break
+
+            sec = SecretToASecret(secret, compressed)
+            k['sec'] = sec
+            k['hexsec'] = secret[:32].encode('hex')
+            k['secret'] = secret.encode('hex')
+            k['compressed'] = compressed
+            addr_to_keys[k['addr']]=[sec, k['pubkey']]
+#           del(k['ckey'])
+#           del(k['secret'])
+#           del(k['pubkey'])
+            private_keys.append(sec)
+        if ppcorrect:
+            print "The wallet is encrypted and the passphrase is correct"
+
+    for k in json_db['keys']:
+        if k['compressed'] and 'secret' in k:
+            k['secret']+="01"
+
+#   del(json_db['pool'])
+#   del(json_db['names'])
+    if vers > -1:
+        addrtype = oldaddrtype
+
+    return {'crypted':crypted}
 
 
 
 def importprivkey(db, sec, label, reserve, keyishex, verbose=True, addrv=addrtype):
-	if keyishex is None:
-		pkey = regenerate_key(sec)
-		compressed = is_compressed(sec)
-	elif len(sec) == 64:
-		pkey = EC_KEY(str_to_long(sec.decode('hex')))
-		compressed = False
-	elif len(sec) == 66:
-		pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
-		compressed = True
-	else:
-		print("Hexadecimal private keys must be 64 or 66 characters long (specified one is "+str(len(sec))+" characters long)")
-		return False
+    if keyishex is None:
+        pkey = regenerate_key(sec)
+        compressed = is_compressed(sec)
+    elif len(sec) == 64:
+        pkey = EC_KEY(str_to_long(sec.decode('hex')))
+        compressed = False
+    elif len(sec) == 66:
+        pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
+        compressed = True
+    else:
+        print("Hexadecimal private keys must be 64 or 66 characters long (specified one is "+str(len(sec))+" characters long)")
+        return False
 
-	if not pkey:
-		return False
+    if not pkey:
+        return False
 
-	secret = GetSecret(pkey)
-	private_key = GetPrivKey(pkey, compressed)
-	public_key = GetPubKey(pkey, compressed)
-	addr = public_key_to_bc_address(public_key, addrv)
+    secret = GetSecret(pkey)
+    private_key = GetPrivKey(pkey, compressed)
+    public_key = GetPubKey(pkey, compressed)
+    addr = public_key_to_bc_address(public_key, addrv)
 
-	if verbose:
-		print "Address (%s): %s"%(aversions[addrv], addr)
-		print "Privkey (%s): %s"%(aversions[addrv], SecretToASecret(secret, compressed))
-		print "Hexprivkey: %s"%(secret.encode('hex'))
-		print "Hash160: %s"%(bc_address_to_hash_160(addr).encode('hex'))
-		if not compressed:
-			print "Pubkey: 04%.64x%.64x"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
-		else:
-			print "Pubkey: 0%d%.64x"%(2+(pkey.pubkey.point.y()&1), pkey.pubkey.point.x())
-		if int(secret.encode('hex'), 16)>_r:
-			print 'Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r)
-
-
-
-	global crypter, passphrase, json_db
-	crypted = False
-	if 'mkey' in json_db.keys() and 'salt' in json_db['mkey']:
-		crypted = True
-	if crypted:
-		if passphrase:
-			cry_master = json_db['mkey']['encrypted_key'].decode('hex')
-			cry_salt   = json_db['mkey']['salt'].decode('hex')
-			cry_rounds = json_db['mkey']['nDerivationIterations']
-			cry_method = json_db['mkey']['nDerivationMethod']
-
-			crypter.SetKeyFromPassphrase(passphrase, cry_salt, cry_rounds, cry_method)
-#			if verbose:
-#				print "Import with", passphrase, "", cry_master.encode('hex'), "", cry_salt.encode('hex')
-			masterkey = crypter.Decrypt(cry_master)
-			crypter.SetKey(masterkey)
-			crypter.SetIV(Hash(public_key))
-			e = crypter.Encrypt(secret)
-			ck_epk=e
-
-			update_wallet(db, 'ckey', { 'public_key' : public_key, 'encrypted_private_key' : ck_epk })
-	else:
-		update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
-
-	if not reserve:
-		update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
+    if verbose:
+        print "Address (%s): %s"%(aversions[addrv], addr)
+        print "Privkey (%s): %s"%(aversions[addrv], SecretToASecret(secret, compressed))
+        print "Hexprivkey: %s"%(secret.encode('hex'))
+        print "Hash160: %s"%(bc_address_to_hash_160(addr).encode('hex'))
+        if not compressed:
+            print "Pubkey: 04%.64x%.64x"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
+        else:
+            print "Pubkey: 0%d%.64x"%(2+(pkey.pubkey.point.y()&1), pkey.pubkey.point.x())
+        if int(secret.encode('hex'), 16)>_r:
+            print 'Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r)
 
 
-	return True
+
+    global crypter, passphrase, json_db
+    crypted = False
+    if 'mkey' in json_db.keys() and 'salt' in json_db['mkey']:
+        crypted = True
+    if crypted:
+        if passphrase:
+            cry_master = json_db['mkey']['encrypted_key'].decode('hex')
+            cry_salt   = json_db['mkey']['salt'].decode('hex')
+            cry_rounds = json_db['mkey']['nDerivationIterations']
+            cry_method = json_db['mkey']['nDerivationMethod']
+
+            crypter.SetKeyFromPassphrase(passphrase, cry_salt, cry_rounds, cry_method)
+#           if verbose:
+#               print "Import with", passphrase, "", cry_master.encode('hex'), "", cry_salt.encode('hex')
+            masterkey = crypter.Decrypt(cry_master)
+            crypter.SetKey(masterkey)
+            crypter.SetIV(Hash(public_key))
+            e = crypter.Encrypt(secret)
+            ck_epk=e
+
+            update_wallet(db, 'ckey', { 'public_key' : public_key, 'encrypted_private_key' : ck_epk })
+    else:
+        update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
+
+    if not reserve:
+        update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
+
+
+    return True
 
 def balance(site, address):
-	page=urllib.urlopen("%s%s" % (site, address))
-	return page.read()
+    page=urllib.urlopen("%s%s" % (site, address))
+    return page.read()
 
 def read_jsonfile(filename):
-	filin = open(filename, 'r')
-	txdump = filin.read()
-	filin.close()
-	return json.loads(txdump)
+    filin = open(filename, 'r')
+    txdump = filin.read()
+    filin.close()
+    return json.loads(txdump)
 
 def write_jsonfile(filename, array):
-	filout = open(filename, 'w')
-	filout.write(json.dumps(array, sort_keys=True, indent=0))
-	filout.close()
+    filout = open(filename, 'w')
+    filout.write(json.dumps(array, sort_keys=True, indent=0))
+    filout.close()
 
 def keyinfo(sec, keyishex):
-	if keyishex is None:
-		pkey = regenerate_key(sec)
-		compressed = is_compressed(sec)
-	elif len(sec) == 64:
-		pkey = EC_KEY(str_to_long(sec.decode('hex')))
-		compressed = False
-	elif len(sec) == 66:
-		pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
-		compressed = True
-	else:
-		print("Hexadecimal private keys must be 64 or 66 characters long (specified one is "+str(len(sec))+" characters long)")
-		exit(0)
+    if keyishex is None:
+        pkey = regenerate_key(sec)
+        compressed = is_compressed(sec)
+    elif len(sec) == 64:
+        pkey = EC_KEY(str_to_long(sec.decode('hex')))
+        compressed = False
+    elif len(sec) == 66:
+        pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
+        compressed = True
+    else:
+        print("Hexadecimal private keys must be 64 or 66 characters long (specified one is "+str(len(sec))+" characters long)")
+        exit(0)
 
-	if not pkey:
-		return False
+    if not pkey:
+        return False
 
-	secret = GetSecret(pkey)
-	private_key = GetPrivKey(pkey, compressed)
-	public_key = GetPubKey(pkey, compressed)
-	addr = public_key_to_bc_address(public_key)
+    secret = GetSecret(pkey)
+    private_key = GetPrivKey(pkey, compressed)
+    public_key = GetPubKey(pkey, compressed)
+    addr = public_key_to_bc_address(public_key)
 
-	print "Address (%s): %s" % ( aversions[addrtype], addr )
-	print "Privkey (%s): %s" % ( aversions[addrtype], SecretToASecret(secret, compressed) )
-	print "Hexprivkey:   %s" % secret.encode('hex')
-	print "Hash160:      %s"%(bc_address_to_hash_160(addr).encode('hex'))
+    print "Address (%s): %s" % ( aversions[addrtype], addr )
+    print "Privkey (%s): %s" % ( aversions[addrtype], SecretToASecret(secret, compressed) )
+    print "Hexprivkey:   %s" % secret.encode('hex')
+    print "Hash160:      %s"%(bc_address_to_hash_160(addr).encode('hex'))
 
-	return True
+    return True
 
 def css_wui():
-	return """html, body {
+    return """html, body {
   height: 100%;
   width: 100%;
   padding: 0;
@@ -2736,69 +2744,69 @@ def css_wui():
 }
 
 body {
-	margin: 0px;
-	padding: 0px;
-	background: url(data:image/jpeg;base64,/9j/4QAYRXhpZgAASUkqAAgAAAAAAAAAAAAAAP/sABFEdWNreQABAAQAAABLAAD/4QMpaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjAtYzA2MSA2NC4xNDA5NDksIDIwMTAvMTIvMDctMTA6NTc6MDEgICAgICAgICI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+IDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bXA6Q3JlYXRvclRvb2w9IkFkb2JlIFBob3Rvc2hvcCBDUzUgV2luZG93cyIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozRjJGNUI0ODZBN0YxMUUyQkZGRUNDQzgwNjYxQkJENCIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozRjJGNUI0OTZBN0YxMUUyQkZGRUNDQzgwNjYxQkJENCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOjNGMkY1QjQ2NkE3RjExRTJCRkZFQ0NDODA2NjFCQkQ0IiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjNGMkY1QjQ3NkE3RjExRTJCRkZFQ0NDODA2NjFCQkQ0Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+/+4ADkFkb2JlAGTAAAAAAf/bAIQAAwICAgICAwICAwUDAwMFBQQDAwQF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%3D%3D) repeat;
-	font-family: 'Open Sans', sans-serif;
-	font-size: 10pt;
-	color: #B0B0B0;
+    margin: 0px;
+    padding: 0px;
+    background: url(data:image/jpeg;base64,/9j/4QAYRXhpZgAASUkqAAgAAAAAAAAAAAAAAP/sABFEdWNreQABAAQAAABLAAD/4QMpaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA1LjAtYzA2MSA2NC4xNDA5NDksIDIwMTAvMTIvMDctMTA6NTc6MDEgICAgICAgICI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+IDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bXA6Q3JlYXRvclRvb2w9IkFkb2JlIFBob3Rvc2hvcCBDUzUgV2luZG93cyIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozRjJGNUI0ODZBN0YxMUUyQkZGRUNDQzgwNjYxQkJENCIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozRjJGNUI0OTZBN0YxMUUyQkZGRUNDQzgwNjYxQkJENCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOjNGMkY1QjQ2NkE3RjExRTJCRkZFQ0NDODA2NjFCQkQ0IiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjNGMkY1QjQ3NkE3RjExRTJCRkZFQ0NDODA2NjFCQkQ0Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+/+4ADkFkb2JlAGTAAAAAAf/bAIQAAwICAgICAwICAwUDAwMFBQQDAwQF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%3D%3D) repeat;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 10pt;
+    color: #B0B0B0;
 }
 
 
 h1, h2, h3 {
-	margin: 0;
-	padding: 0;
+    margin: 0;
+    padding: 0;
 }
 
 h2
 {
-	font-weight: 400;
-	font-family: 'Archivo Narrow', sans-serif;
-	font-size: 2.50em;
+    font-weight: 400;
+    font-family: 'Archivo Narrow', sans-serif;
+    font-size: 2.50em;
 }
 
 p, ol, ul {
-	margin-top: 0px;
+    margin-top: 0px;
 }
 
 p {
-	line-height: 180%;
+    line-height: 180%;
 }
 
 strong {
 }
 
 a {
-	color: #1492C4;
+    color: #1492C4;
 }
 
 a:hover {
-	text-decoration: none;
+    text-decoration: none;
 }
 
 a img {
-	border: none;
+    border: none;
 }
 
 img.border {
-	border: 10px solid rgba(255,255,255,.10);
+    border: 10px solid rgba(255,255,255,.10);
 }
 
 img.alignleft {
-	float: left;
-	margin-right: 30px;
+    float: left;
+    margin-right: 30px;
 }
 
 img.alignright {
-	float: right;
+    float: right;
 }
 
 img.aligncenter {
-	margin: 0px auto;
+    margin: 0px auto;
 }
 
 hr {
-	display: none;
+    display: none;
 }
 
 #retour-pyw{
@@ -2806,11 +2814,11 @@ hr {
 }
 
 #uptodate{
-	position:absolute;
-	top:0px;
-	right:0px;
-	background: rgba(0,0,0,0.70);
-	padding:10px;
+    position:absolute;
+    top:0px;
+    right:0px;
+    background: rgba(0,0,0,0.70);
+    padding:10px;
 }
 
 #full-screen-background-image {
@@ -2829,163 +2837,163 @@ hr {
   width: 100%;
   min-height: 400px;
   #margin: 30px auto;
-	margin-top:10px;  #decalage p/r haut
+    margin-top:10px;  #decalage p/r haut
 }
 
 #wrapper {
-	overflow: hidden;
+    overflow: hidden;
 }
 
 .container {
-	width: 1000px;
-	margin: 0px auto;
+    width: 1000px;
+    margin: 0px auto;
 }
 
 .clearfix {
-	clear: both;
+    clear: both;
 }
 
 /** HEADER */
 
 #header-wrapper-title
 {
-	overflow: hidden;
-	height: 80px;
-	margin-bottom: 10px;
-	background: rgba(0,0,0,0);
+    overflow: hidden;
+    height: 80px;
+    margin-bottom: 10px;
+    background: rgba(0,0,0,0);
 }
 
 #header-wrapper
 {
-	overflow: hidden;
-	height: 50px;
-	margin-bottom: 20px;
-	background: rgba(0,0,0,0.70);
+    overflow: hidden;
+    height: 50px;
+    margin-bottom: 20px;
+    background: rgba(0,0,0,0.70);
 }
 
 #header {
-	overflow: hidden;
+    overflow: hidden;
 }
 
 /** LOGO */
 
 #logo {
-	float: left;
-	#width: 300px;
-	height: 50px;
+    float: left;
+    #width: 300px;
+    height: 50px;
 
 }
 
 #logo h1, #logo p {
-	margin: 0px;
-	line-height: normal;
+    margin: 0px;
+    line-height: normal;
 }
 
 #logo h1 a {
-	padding-left: 00px;
-	text-decoration: none;
-	font-size: 2.50em;
-	font-weight: 400;
-	font-family: 'Archivo Narrow', sans-serif;
-	color: #FFFFFF;
+    padding-left: 00px;
+    text-decoration: none;
+    font-size: 2.50em;
+    font-weight: 400;
+    font-family: 'Archivo Narrow', sans-serif;
+    color: #FFFFFF;
 }
 
 /** MENU */
 
 #menu {
-	float: left;
-	height: 50px;
+    float: left;
+    height: 50px;
 }
 
 #menu ul {
-	margin: 0px;
-	padding: 0px;
-	list-style: none;
-	line-height: normal;
+    margin: 0px;
+    padding: 0px;
+    list-style: none;
+    line-height: normal;
 }
 
 #menu li {
-	float: left;
-	margin-right: 10px;
-	padding: 0px 5px 0px 5px;
+    float: left;
+    margin-right: 10px;
+    padding: 0px 5px 0px 5px;
 }
 
 #menu a {
-	display: block;
-	height: 50px;
-	padding: 0px 10px;
-	line-height: 50px;
-	text-decoration: none;
-	text-transform: uppercase;
-	color: #FFFFFF;
+    display: block;
+    height: 50px;
+    padding: 0px 10px;
+    line-height: 50px;
+    text-decoration: none;
+    text-transform: uppercase;
+    color: #FFFFFF;
 }
 
 #menu a:hover {
-	text-decoration: none;
-	background: rgba(0,0,0,0.70);
+    text-decoration: none;
+    background: rgba(0,0,0,0.70);
 }
 
 #menu .active
 {
-	background: rgba(0,0,0,0.70);
+    background: rgba(0,0,0,0.70);
 }
 
 /** PAGE */
 
 #page {
-	overflow: hidden;
-	margin-bottom: 20px;
+    overflow: hidden;
+    margin-bottom: 20px;
 }
 
 /** CONTENT */
 
 #content {
-	float: left;
-	width: 950px;
-	padding: 40px;
-	background: rgba(0,0,0,0.70);
+    float: left;
+    width: 950px;
+    padding: 40px;
+    background: rgba(0,0,0,0.70);
 }
 
 #content h2 a
 {
-	display: block;
-	padding: 0px 0px 20px 0px;
-	text-decoration: none;
-	color: #FFFFFF;
+    display: block;
+    padding: 0px 0px 20px 0px;
+    text-decoration: none;
+    color: #FFFFFF;
 }
 
 #content #box1
 {
-	margin-bottom: 0px;
+    margin-bottom: 0px;
 }
 
 /** SIDEBAR */
 
 #sidebar {
-	float: right;
-	width: 350px;
-	padding: 20px;
-	background: rgba(0,0,0,0.70);
+    float: right;
+    width: 350px;
+    padding: 20px;
+    background: rgba(0,0,0,0.70);
 }
 
 #sidebar h2
 {
-	padding: 0px 0px 00px 0px;
-	color: #FFFFFF;
+    padding: 0px 0px 00px 0px;
+    color: #FFFFFF;
 }
 
 /* Footer */
 
 #footer {
-	overflow: hidden;
-	margin: 00px auto 0px auto;
-	padding: 10px 0px;
-	background: rgba(0,0,0,0.70);
+    overflow: hidden;
+    margin: 00px auto 0px auto;
+    padding: 10px 0px;
+    background: rgba(0,0,0,0.70);
 }
 
 #footer p {
-	text-align: center;
-	font-size: 12px;
+    text-align: center;
+    font-size: 12px;
 }
 
 #footer a {
@@ -2994,131 +3002,131 @@ hr {
 /** LIST STYLE 1 */
 
 ul.style1 {
-	margin: 0px;
-	padding: 10px 0px 0px 0px;
-	list-style: none;
+    margin: 0px;
+    padding: 10px 0px 0px 0px;
+    list-style: none;
 }
 
 ul.style1 li {
-	clear: both;
-	margin-bottom: 25px;
-	padding: 30px 0px 40px 0px;
-	border-top: 1px solid #000000;
-	box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+    clear: both;
+    margin-bottom: 25px;
+    padding: 30px 0px 40px 0px;
+    border-top: 1px solid #000000;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
 }
 
 ul.style1 h3 {
-	padding-bottom: 5px;
-	font-size: 14px;
-	color: #FFFFFF;
+    padding-bottom: 5px;
+    font-size: 14px;
+    color: #FFFFFF;
 }
 
 ul.style1 p {
-	line-height: 150%;
+    line-height: 150%;
 }
 
 ul.style1 .button-style {
-	float: left;
-	margin-top: 0px;
+    float: left;
+    margin-top: 0px;
 }
 
 ul.style1 .first {
-	padding-top: 0px;
-	border-top: none;
-	box-shadow: none;
+    padding-top: 0px;
+    border-top: none;
+    box-shadow: none;
 }
 
 /** LIST STYLE 3 */
 
 ul.style3 {
-	margin: 0px;
-	padding: 0px;
-	list-style: none;
+    margin: 0px;
+    padding: 0px;
+    list-style: none;
 }
 
 ul.style3 li {
-	padding: 10px 0px 10px 0px;
-	border-top: 1px solid #000000;
-	box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+    padding: 10px 0px 10px 0px;
+    border-top: 1px solid #000000;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
 }
 
 ul.style3 a {
-	text-decoration: none;
-	color: #949494;
+    text-decoration: none;
+    color: #949494;
 }
 
 ul.style3 a:hover {
-	text-decoration: underline;
+    text-decoration: underline;
 }
 
 ul.style3 .first {
-	padding-top: 0px;
-	border-top: none;
-	box-shadow: none;
+    padding-top: 0px;
+    border-top: none;
+    box-shadow: none;
 }
 
 ul.style3 .date {
-	width: 87px;
-	background-color: #1F768D;
-	margin-top: 20px;
-	height: 24px;
-	line-height: 24px;
-	text-align: center;
-	font-size: 12px;
-	color: #FFFFFF;
+    width: 87px;
+    background-color: #1F768D;
+    margin-top: 20px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: #FFFFFF;
 }
 
 ul.style3 .first .date
 {
-	margin-top: 0px;
+    margin-top: 0px;
 }
 
 .button-style
 {
-	display: inline-block;
-	background-color: #1F768D;
-	margin-top: 0px;
-	padding: 5px 30px;
-	height: 24px;
-	line-height: 24px;
-	text-decoration: none;
-	text-align: center;
-	color: #FFFFFF;
+    display: inline-block;
+    background-color: #1F768D;
+    margin-top: 0px;
+    padding: 5px 30px;
+    height: 24px;
+    line-height: 24px;
+    text-decoration: none;
+    text-align: center;
+    color: #FFFFFF;
 }
 
 .button-style-red
 {
-	color: #ffffff;
-	display: inline-block;
-	background-color: #a12323;
-	margin-top: 20px;
-	padding: 5px 30px;
-	height: 24px;
-	line-height: 24px;
-	text-decoration: none;
-	text-align: center;
+    color: #ffffff;
+    display: inline-block;
+    background-color: #a12323;
+    margin-top: 20px;
+    padding: 5px 30px;
+    height: 24px;
+    line-height: 24px;
+    text-decoration: none;
+    text-align: center;
 }
 
 .entry
 {
-	margin-bottom: 30px;
+    margin-bottom: 30px;
 }
 """
 
 def onclick_on_tab(page):
-	list=['DumpPage','ImportPage','DeletePage','InfoPage','AboutPage','PassphrasePage','TxPage']
-	r=''
-	for p in list:
-		if p!=page:
-			r+="document.getElementById('"+p+"').style.display='none';"
-			r+="document.getElementById('"+p+"Button').className='';"
-	r+="document.getElementById('"+page+"').style.display='block';"
-	r+="document.getElementById('"+page+"Button').className='active';"
-	return r
+    list=['DumpPage','ImportPage','DeletePage','InfoPage','AboutPage','PassphrasePage','TxPage']
+    r=''
+    for p in list:
+        if p!=page:
+            r+="document.getElementById('"+p+"').style.display='none';"
+            r+="document.getElementById('"+p+"Button').className='';"
+    r+="document.getElementById('"+page+"').style.display='block';"
+    r+="document.getElementById('"+page+"Button').className='active';"
+    return r
 
 def html_wui(listcontent,uptodate_text):
-	global pywversion
-	return """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+    global pywversion
+    return """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
@@ -3162,57 +3170,57 @@ def html_wui(listcontent,uptodate_text):
 </head>
 <body>
 <div id="wrapper">
-	<div id="header-wrapper-title">
-		<div id="header" class="container">
-			<div id="logo" style="height: 150px;">
-				<h1><a href="#">Pywallet """+str(pywversion)+"""</a></h1>
-			</div>
-		</div>
-	</div>
-	<div id="header-wrapper">
-			<div style="width:300px;float: left;">&nbsp;</div>
-			<div id="menu">
-				<ul>
-					<li id="DumpPageButton" class="active"><a href="#" accesskey="1" title="" onclick=" """+onclick_on_tab('DumpPage')+""" " >Dump</a></li>
-					<li id="ImportPageButton"><a href="#" accesskey="2" title="" onclick=" """+onclick_on_tab('ImportPage')+""" " >Import</a></li>
-					<li id="InfoPageButton"><a href="#" accesskey="3" title="" onclick=" """+onclick_on_tab('InfoPage')+""" " >Info</a></li>
-					<li id="DeletePageButton"><a href="#" accesskey="4" title="" onclick=" """+onclick_on_tab('DeletePage')+""" " >Delete</a></li>
-					<li id="PassphrasePageButton"><a href="#" accesskey="5" title="" onclick=" """+onclick_on_tab('PassphrasePage')+""" " >Passphrase</a></li>
-					<li id="TxPageButton"><a href="#" accesskey="6" title="" onclick=" """+onclick_on_tab('TxPage')+""" " >Transaction</a></li>
-					<li id="AboutPageButton"><a href="#" accesskey="7" title="" onclick=" """+onclick_on_tab('AboutPage')+""" " >About</a></li>
-					<li id="QuitPageButton"><a href="quit">Stop</a></li>
-				</ul>
-			</div>
-	</div>
-	<div id="page" class="container">
-		<div id="content">
-			"""+listcontent+"""
-		</div>
-		<div id="sidebar" style="display:none;">
-			<a href="#" class="button-style-red" style="float:right;position:relative;top:-15px;" onclick="document.getElementById('content').style.width='950px';document.getElementById('content').style.display='block';document.getElementById('sidebar').style.display='none';document.getElementById('sidebar').style.width='350px';">Close</a>
-			<a href="#" class="button-style" style="float:right;position:relative;top:5px;left:-10px;" onclick="
-			if(document.getElementById('content').style.display=='none'){
-				document.getElementById('sidebar').style.width='350px';
-				document.getElementById('content').style.width='500px';
-				document.getElementById('content').style.display='block';
-				this.innerHTML='Full page';
-			}else{
-				document.getElementById('sidebar').style.width='970px';
-				document.getElementById('content').style.display='none';
-				this.innerHTML='Reduce';
-			}
-			document.getElementById('sidebar').style.display='block';
-			">Full page</a>
-			<h2 style="positive:relative;top:-20px;">Data</h2>
-			<br />
-			<br />
-			<p id="retour-pyw">
-			</p>
-		</div>
-	</div>
-	<div id="footer">
-		<p><a href="http://pywallet.tk">Instructions to use Pywallet</a></p>
-	</div>
+    <div id="header-wrapper-title">
+        <div id="header" class="container">
+            <div id="logo" style="height: 150px;">
+                <h1><a href="#">Pywallet """+str(pywversion)+"""</a></h1>
+            </div>
+        </div>
+    </div>
+    <div id="header-wrapper">
+            <div style="width:300px;float: left;">&nbsp;</div>
+            <div id="menu">
+                <ul>
+                    <li id="DumpPageButton" class="active"><a href="#" accesskey="1" title="" onclick=" """+onclick_on_tab('DumpPage')+""" " >Dump</a></li>
+                    <li id="ImportPageButton"><a href="#" accesskey="2" title="" onclick=" """+onclick_on_tab('ImportPage')+""" " >Import</a></li>
+                    <li id="InfoPageButton"><a href="#" accesskey="3" title="" onclick=" """+onclick_on_tab('InfoPage')+""" " >Info</a></li>
+                    <li id="DeletePageButton"><a href="#" accesskey="4" title="" onclick=" """+onclick_on_tab('DeletePage')+""" " >Delete</a></li>
+                    <li id="PassphrasePageButton"><a href="#" accesskey="5" title="" onclick=" """+onclick_on_tab('PassphrasePage')+""" " >Passphrase</a></li>
+                    <li id="TxPageButton"><a href="#" accesskey="6" title="" onclick=" """+onclick_on_tab('TxPage')+""" " >Transaction</a></li>
+                    <li id="AboutPageButton"><a href="#" accesskey="7" title="" onclick=" """+onclick_on_tab('AboutPage')+""" " >About</a></li>
+                    <li id="QuitPageButton"><a href="quit">Stop</a></li>
+                </ul>
+            </div>
+    </div>
+    <div id="page" class="container">
+        <div id="content">
+            """+listcontent+"""
+        </div>
+        <div id="sidebar" style="display:none;">
+            <a href="#" class="button-style-red" style="float:right;position:relative;top:-15px;" onclick="document.getElementById('content').style.width='950px';document.getElementById('content').style.display='block';document.getElementById('sidebar').style.display='none';document.getElementById('sidebar').style.width='350px';">Close</a>
+            <a href="#" class="button-style" style="float:right;position:relative;top:5px;left:-10px;" onclick="
+            if(document.getElementById('content').style.display=='none'){
+                document.getElementById('sidebar').style.width='350px';
+                document.getElementById('content').style.width='500px';
+                document.getElementById('content').style.display='block';
+                this.innerHTML='Full page';
+            }else{
+                document.getElementById('sidebar').style.width='970px';
+                document.getElementById('content').style.display='none';
+                this.innerHTML='Reduce';
+            }
+            document.getElementById('sidebar').style.display='block';
+            ">Full page</a>
+            <h2 style="positive:relative;top:-20px;">Data</h2>
+            <br />
+            <br />
+            <p id="retour-pyw">
+            </p>
+        </div>
+    </div>
+    <div id="footer">
+        <p><a href="http://pywallet.tk">Instructions to use Pywallet</a></p>
+    </div>
 </div>
 <div id="uptodate">"""+uptodate_text+"""</div>
 </body>
@@ -3220,608 +3228,608 @@ def html_wui(listcontent,uptodate_text):
 """
 
 def WI_FormInit(title, action, divname):
-	return "<li><h3>%s</h3>"%title
-	return '<style>#h'+divname+':hover{color:red;}</style><h3 id="h'+divname+'" onClick="document.getElementById(\''+divname+'\').style.display=(document.getElementById(\''+divname+'\').style.display==\'none\')?\'block\':\'none\';document.getElementById(\'iconOF_'+divname+'\').innerHTML=image_showdiv(\''+divname+'\');"><span style="width:21px;" id="iconOF_'+divname+'"><img src="http://creation-entreprise.comprendrechoisir.com/img/puce_tab_down.png" /></span>&nbsp;&nbsp;'+title+'</h3><div id="'+divname+'"><form style="margin-left:15px;" action="'+action+'" method=get>'
+    return "<li><h3>%s</h3>"%title
+    return '<style>#h'+divname+':hover{color:red;}</style><h3 id="h'+divname+'" onClick="document.getElementById(\''+divname+'\').style.display=(document.getElementById(\''+divname+'\').style.display==\'none\')?\'block\':\'none\';document.getElementById(\'iconOF_'+divname+'\').innerHTML=image_showdiv(\''+divname+'\');"><span style="width:21px;" id="iconOF_'+divname+'"><img src="http://creation-entreprise.comprendrechoisir.com/img/puce_tab_down.png" /></span>&nbsp;&nbsp;'+title+'</h3><div id="'+divname+'"><form style="margin-left:15px;" action="'+action+'" method=get>'
 
 def WI_InputText(label, name, id, value, size=30):
-	return '%s<input type=text name="%s" id="%s" value="%s" size=%s /><br />'%(label, name, id, value, size)
+    return '%s<input type=text name="%s" id="%s" value="%s" size=%s /><br />'%(label, name, id, value, size)
 
 def WI_InputPassword(label, name, id, value, size=30):
-	return '%s<input type=password name="%s" id="%s" value="%s" size=%s /><br />'%(label, name, id, value, size)
+    return '%s<input type=password name="%s" id="%s" value="%s" size=%s /><br />'%(label, name, id, value, size)
 
 def WI_Submit(value, local_block, local_button, function):
-	return """<br /><a href="#" class="button-style"  onClick="document.getElementById('content').style.width='500px';document.getElementById('sidebar').style.display='block';%s();return false;">%s</a>"""%(function,value)
+    return """<br /><a href="#" class="button-style"  onClick="document.getElementById('content').style.width='500px';document.getElementById('sidebar').style.display='block';%s();return false;">%s</a>"""%(function,value)
 
 def WI_CloseButton(local_block, local_button):
-	return '<input type=button value="Close" onClick="document.getElementById(\'%s\').style.display=\'none\';document.getElementById(\'%s\').style.display=\'none\';" id="%s" style="display:none;" />'%(local_block, local_button, local_button)
+    return '<input type=button value="Close" onClick="document.getElementById(\'%s\').style.display=\'none\';document.getElementById(\'%s\').style.display=\'none\';" id="%s" style="display:none;" />'%(local_block, local_button, local_button)
 
 def WI_ReturnDiv(local_block):
-	return '<div id="%s" style="display:none;margin:10px 3%% 10px;padding:10px;overflow:auto;width:90%%;max-height:600px;background-color:#fff8dd;"></div>'%(local_block)
+    return '<div id="%s" style="display:none;margin:10px 3%% 10px;padding:10px;overflow:auto;width:90%%;max-height:600px;background-color:#fff8dd;"></div>'%(local_block)
 
 def WI_FormEnd():
-	return "</li>"
+    return "</li>"
 
 def WI_RadioButton(name, value, id, checked, label):
-	return '&nbsp;&nbsp;&nbsp;<input type="radio" name="%s" value="%s" id="%s" %s >%s<br>'%(name, value, id, checked, label)
+    return '&nbsp;&nbsp;&nbsp;<input type="radio" name="%s" value="%s" id="%s" %s >%s<br>'%(name, value, id, checked, label)
 
 def WI_Checkbox(name, value, id, other, label):
-	return '<input type="checkbox" name="%s" value="%s" id="%s" %s />%s'%(name, value, id, other, label)
+    return '<input type="checkbox" name="%s" value="%s" id="%s" %s />%s'%(name, value, id, other, label)
 
 def WI_Endiv(t,name,title, desc,hidden=False):
-	return '<div id="'+name+'" style="display:'+X_if_else('none',hidden,'block')+';"><div id="box1"><h2 class="title"><a href="#">'+title+'</a></h2>'+X_if_else('<p>'+desc+'</p>',desc!='','')+'</div><div ><ul class="style1">'+t+'</ul></div></div>'
+    return '<div id="'+name+'" style="display:'+X_if_else('none',hidden,'block')+';"><div id="box1"><h2 class="title"><a href="#">'+title+'</a></h2>'+X_if_else('<p>'+desc+'</p>',desc!='','')+'</div><div ><ul class="style1">'+t+'</ul></div></div>'
 
 def WI_AjaxFunction(name, command_when_ready, query_string, command_until_ready):
-	return '\n\
+    return '\n\
 function ajax%s(){\n\
-	var ajaxRequest;\n\
-	try{\n\
-		ajaxRequest = new XMLHttpRequest();\n\
-	} catch (e){\n\
-		try{\n\
-			ajaxRequest = new ActiveXObject("Msxml2.XMLHTTP");\n\
-		} catch (e) {\n\
-			try{\n\
-				ajaxRequest = new ActiveXObject("Microsoft.XMLHTTP");\n\
-			} catch (e){\n\
-				alert("Your browser broke!");\n\
-				return false;\n\
-			}\n\
-		}\n\
-	}\n\
-	ajaxRequest.onreadystatechange = function(){\n\
-		if(ajaxRequest.readyState == 4){\n\
-			%s\n\
-		}\n\
-	};\n\
-	var queryString = %s;\n\
-	ajaxRequest.open("GET", queryString, true);\n\
-	%s\n\
-	ajaxRequest.send(null);\n\
+    var ajaxRequest;\n\
+    try{\n\
+        ajaxRequest = new XMLHttpRequest();\n\
+    } catch (e){\n\
+        try{\n\
+            ajaxRequest = new ActiveXObject("Msxml2.XMLHTTP");\n\
+        } catch (e) {\n\
+            try{\n\
+                ajaxRequest = new ActiveXObject("Microsoft.XMLHTTP");\n\
+            } catch (e){\n\
+                alert("Your browser broke!");\n\
+                return false;\n\
+            }\n\
+        }\n\
+    }\n\
+    ajaxRequest.onreadystatechange = function(){\n\
+        if(ajaxRequest.readyState == 4){\n\
+            %s\n\
+        }\n\
+    };\n\
+    var queryString = %s;\n\
+    ajaxRequest.open("GET", queryString, true);\n\
+    %s\n\
+    ajaxRequest.send(null);\n\
 }\n\
 \n\
 '%(name, command_when_ready, query_string, command_until_ready)
 
 def X_if_else(iftrue, cond, iffalse):
-	if cond:
-		return iftrue
-	return iffalse
+    if cond:
+        return iftrue
+    return iffalse
 
 def export_all_keys(db, ks, filename):
-	txt=";".join(ks)+"\n"
-	for i in db['keys']:
-	  try:
-		j=i.copy()
-		if 'label' not in j:
-			j['label']='#Reserve'
-		t=";".join([str(j[k]) for k in ks])
-		txt+=t+"\n"
-	  except:
-		return False
+    txt=";".join(ks)+"\n"
+    for i in db['keys']:
+      try:
+        j=i.copy()
+        if 'label' not in j:
+            j['label']='#Reserve'
+        t=";".join([str(j[k]) for k in ks])
+        txt+=t+"\n"
+      except:
+        return False
 
-	try:
-		myFile = open(filename, 'w')
-		myFile.write(txt)
-		myFile.close()
-		return True
-	except:
-		return False
+    try:
+        myFile = open(filename, 'w')
+        myFile.write(txt)
+        myFile.close()
+        return True
+    except:
+        return False
 
 def import_csv_keys(filename, wdir, wname, nbremax=9999999):
-	global global_merging_message
-	if filename[0]=="\x00":    #yeah, dirty workaround
-		content=filename[1:]
-	else:
-		filen = open(filename, "r")
-		content = filen.read()
-		filen.close()
+    global global_merging_message
+    if filename[0]=="\x00":    #yeah, dirty workaround
+        content=filename[1:]
+    else:
+        filen = open(filename, "r")
+        content = filen.read()
+        filen.close()
 
-	db_env = create_env(wdir)
-	read_wallet(json_db, db_env, wname, True, True, "", None)
-	db = open_wallet(db_env, wname, writable=True)
+    db_env = create_env(wdir)
+    read_wallet(json_db, db_env, wname, True, True, "", None)
+    db = open_wallet(db_env, wname, writable=True)
 
-	content=content.split('\n')
-	content=content[:min(nbremax, len(content))]
-	for i in range(len(content)):
-	  c=content[i]
-	  global_merging_message = ["Merging: "+str(round(100.0*(i+1)/len(content),1))+"%" for j in range(2)]
-	  if ';' in c and len(c)>0 and c[0]!="#":
-		cs=c.split(';')
-		sec,label=cs[0:2]
-		v=addrtype
-		if len(cs)>2:
-			v=int(cs[2])
-		reserve=False
-		if label=="#Reserve":
-			reserve=True
-		keyishex=None
-		if abs(len(sec)-65)==1:
-			keyishex=True
-		importprivkey(db, sec, label, reserve, keyishex, verbose=False, addrv=v)
+    content=content.split('\n')
+    content=content[:min(nbremax, len(content))]
+    for i in range(len(content)):
+      c=content[i]
+      global_merging_message = ["Merging: "+str(round(100.0*(i+1)/len(content),1))+"%" for j in range(2)]
+      if ';' in c and len(c)>0 and c[0]!="#":
+        cs=c.split(';')
+        sec,label=cs[0:2]
+        v=addrtype
+        if len(cs)>2:
+            v=int(cs[2])
+        reserve=False
+        if label=="#Reserve":
+            reserve=True
+        keyishex=None
+        if abs(len(sec)-65)==1:
+            keyishex=True
+        importprivkey(db, sec, label, reserve, keyishex, verbose=False, addrv=v)
 
-	global_merging_message = ["Merging done.", ""]
+    global_merging_message = ["Merging done.", ""]
 
-	db.close()
+    db.close()
 
-	read_wallet(json_db, db_env, wname, True, True, "", None, -1, True)  #Fill the pool if empty
+    read_wallet(json_db, db_env, wname, True, True, "", None, -1, True)  #Fill the pool if empty
 
-	return True
+    return True
 
 def dep_text_aboutpage(val):
-	if val:
-		return "<span style='color:#bb0000;'>Not found</span>"
-	else:
-		return "<span style='color:#00bb00;'>Found</span>"
+    if val:
+        return "<span style='color:#bb0000;'>Not found</span>"
+    else:
+        return "<span style='color:#00bb00;'>Found</span>"
 
 CTX_adds=''
 
 if 'twisted' not in missing_dep:
-	class WIRoot(resource.Resource):
+    class WIRoot(resource.Resource):
 
-		 def render_GET(self, request):
-				try:
-					request.args['update'][0]
-					return update_pyw()
-				except:
-					True
+         def render_GET(self, request):
+                try:
+                    request.args['update'][0]
+                    return update_pyw()
+                except:
+                    True
 
-				uptodate=md5_last_pywallet[1]==md5_pywallet
-				checking_finished=bool(md5_last_pywallet[0])
+                uptodate=md5_last_pywallet[1]==md5_pywallet
+                checking_finished=bool(md5_last_pywallet[0])
 
-				color="#DDDDFF"
-				if checking_finished:
-					if uptodate:
-						color="#DDFFDD"
-					else:
-						color="#FFDDDD"
+                color="#DDDDFF"
+                if checking_finished:
+                    if uptodate:
+                        color="#DDFFDD"
+                    else:
+                        color="#FFDDDD"
 
-				check_version_text = \
+                check_version_text = \
  X_if_else(
-	X_if_else(
-		'Pywallet is up-to-date',
-		uptodate,
-		'Pywallet is <span style="color:red;font-weight:none;">not</span> up-to-date<br /><a href="#" onclick="ajaxUpdatePyw();return false;">Click to update</a>'),
-	checking_finished,
-	'Checking version...'
+    X_if_else(
+        'Pywallet is up-to-date',
+        uptodate,
+        'Pywallet is <span style="color:red;font-weight:none;">not</span> up-to-date<br /><a href="#" onclick="ajaxUpdatePyw();return false;">Click to update</a>'),
+    checking_finished,
+    'Checking version...'
  )
 
-				if beta_version:
-					check_version_text="You are using a beta version<br />Thank you for your help"
-					color="#DDDDDD"
+                if beta_version:
+                    check_version_text="You are using a beta version<br />Thank you for your help"
+                    color="#DDDDDD"
 
-				global pywversion
-				header = '<h1 title="'+pyw_filename+' in '+pyw_path+'">Pywallet Web Interface v'+pywversion+'</h1><h3>CLOSE BITCOIN BEFORE USE!</h3><div style="position:fixed;top:5px;right:5px;border:solid 1px black;padding:15px;background-color:'+color+';font-weight:bold;text-align:center;">' + check_version_text + '</div><br /><br />'
+                global pywversion
+                header = '<h1 title="'+pyw_filename+' in '+pyw_path+'">Pywallet Web Interface v'+pywversion+'</h1><h3>CLOSE BITCOIN BEFORE USE!</h3><div style="position:fixed;top:5px;right:5px;border:solid 1px black;padding:15px;background-color:'+color+';font-weight:bold;text-align:center;">' + check_version_text + '</div><br /><br />'
 
-				CPPForm = WI_FormInit('Change passphrase:', 'ChangePP', 'divformcpp') + \
-							WI_InputPassword('', 'pp', 'cppf-pp', '') + \
-							WI_Submit('Change', 'CPPDiv', 'cppf-close', 'ajaxCPP') + \
-							WI_CloseButton('CPPDiv', 'cppf-close') + \
-							WI_ReturnDiv('CPPDiv') + \
-							WI_FormEnd()
+                CPPForm = WI_FormInit('Change passphrase:', 'ChangePP', 'divformcpp') + \
+                            WI_InputPassword('', 'pp', 'cppf-pp', '') + \
+                            WI_Submit('Change', 'CPPDiv', 'cppf-close', 'ajaxCPP') + \
+                            WI_CloseButton('CPPDiv', 'cppf-close') + \
+                            WI_ReturnDiv('CPPDiv') + \
+                            WI_FormEnd()
 
-				DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet', 'divformdw') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
-							WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
-							WI_Checkbox('bal', 'y', 'dwf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
-							WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
-							WI_CloseButton('DWDiv', 'dwf-close') + \
-							WI_ReturnDiv('DWDiv') + \
-							WI_FormEnd()
+                DWForm = WI_FormInit('Dump your wallet:', 'DumpWallet', 'divformdw') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'dwf-dir', determine_db_dir()) + \
+                            WI_InputText('Wallet Filename: ', 'name', 'dwf-name', determine_db_name(), 20) + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dwf-vers', '0', 1) + \
+                            WI_Checkbox('bal', 'y', 'dwf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
+                            WI_Submit('Dump wallet', 'DWDiv', 'dwf-close', 'ajaxDW') + \
+                            WI_CloseButton('DWDiv', 'dwf-close') + \
+                            WI_ReturnDiv('DWDiv') + \
+                            WI_FormEnd()
 
-				MWForm = WI_FormInit('Merge two wallets:', 'MergeWallets', 'divformmw') + \
-							WI_InputText('Wallet 1 Directory: ', 'dir1', 'mwf-dir1', determine_db_dir()) + \
-							WI_InputText('Wallet 1 Filename: ', 'name1', 'mwf-name1', determine_db_name(), 20) + \
-							WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Wallet 1 Passphrase: </span>', 'pass1', 'mwf-pass1', '') + "<br />" + \
-							WI_InputText('Wallet 2 Directory: ', 'dir2', 'mwf-dir2', determine_db_dir()) + \
-							WI_InputText('Wallet 2 Filename: ', 'name2', 'mwf-name2', "", 20) + \
-							WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Wallet 2 Passphrase: </span>', 'pass2', 'mwf-pass2', '') + "<br />" + \
-							WI_InputText('Merged Wallet Directory: ', 'dirm', 'mwf-dirm', determine_db_dir()) + \
-							WI_InputText('Merged Wallet Filename: ', 'namem', 'mwf-namem', "", 20) + \
-							WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Merged Wallet Passphrase: </span>', 'passm1', 'mwf-passm1', '') + \
-							WI_InputPassword('Repeat Wallet Passphrase: ', 'passm2', 'mwf-passm2', '') + \
-							WI_Submit('Merge wallets', 'MWDiv', 'mwf-close', 'ajaxMW') + \
-							WI_CloseButton('MWDiv', 'mwf-close') + \
-							WI_ReturnDiv('MWDiv') + \
-							WI_FormEnd()
+                MWForm = WI_FormInit('Merge two wallets:', 'MergeWallets', 'divformmw') + \
+                            WI_InputText('Wallet 1 Directory: ', 'dir1', 'mwf-dir1', determine_db_dir()) + \
+                            WI_InputText('Wallet 1 Filename: ', 'name1', 'mwf-name1', determine_db_name(), 20) + \
+                            WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Wallet 1 Passphrase: </span>', 'pass1', 'mwf-pass1', '') + "<br />" + \
+                            WI_InputText('Wallet 2 Directory: ', 'dir2', 'mwf-dir2', determine_db_dir()) + \
+                            WI_InputText('Wallet 2 Filename: ', 'name2', 'mwf-name2', "", 20) + \
+                            WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Wallet 2 Passphrase: </span>', 'pass2', 'mwf-pass2', '') + "<br />" + \
+                            WI_InputText('Merged Wallet Directory: ', 'dirm', 'mwf-dirm', determine_db_dir()) + \
+                            WI_InputText('Merged Wallet Filename: ', 'namem', 'mwf-namem', "", 20) + \
+                            WI_InputPassword('<span style="border: 0 dashed;border-bottom-width:1px;" title="empty if none">Merged Wallet Passphrase: </span>', 'passm1', 'mwf-passm1', '') + \
+                            WI_InputPassword('Repeat Wallet Passphrase: ', 'passm2', 'mwf-passm2', '') + \
+                            WI_Submit('Merge wallets', 'MWDiv', 'mwf-close', 'ajaxMW') + \
+                            WI_CloseButton('MWDiv', 'mwf-close') + \
+                            WI_ReturnDiv('MWDiv') + \
+                            WI_FormEnd()
 
-				DKForm = WI_FormInit('Dump your keys:', 'DumpKeys', 'divformdk') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'dkf-dir', determine_db_dir()) + \
-							WI_InputText('Wallet Filename: ', 'name', 'dkf-name', determine_db_name(), 20) + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dkf-vers', '0', 1) + \
-							WI_InputText('Output file: ', 'file', 'dkf-file', '', 60) + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="to be chosen from the ones in wallet dump, separated with \',\', e.g. \'addr,secret\'">Data to print: </span>', 'keys', 'dkf-keys', '') + \
-							WI_Checkbox('bal', 'y', 'dkf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
-							WI_Submit('Dump keys', 'DKDiv', 'dkf-close', 'ajaxDK') + \
-							WI_CloseButton('DKDiv', 'dkf-close') + \
-							WI_ReturnDiv('DKDiv') + \
-							WI_FormEnd()
+                DKForm = WI_FormInit('Dump your keys:', 'DumpKeys', 'divformdk') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'dkf-dir', determine_db_dir()) + \
+                            WI_InputText('Wallet Filename: ', 'name', 'dkf-name', determine_db_name(), 20) + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'dkf-vers', '0', 1) + \
+                            WI_InputText('Output file: ', 'file', 'dkf-file', '', 60) + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="to be chosen from the ones in wallet dump, separated with \',\', e.g. \'addr,secret\'">Data to print: </span>', 'keys', 'dkf-keys', '') + \
+                            WI_Checkbox('bal', 'y', 'dkf-bal', '', ' Dump with balance (can take minutes)') + "<br />" + \
+                            WI_Submit('Dump keys', 'DKDiv', 'dkf-close', 'ajaxDK') + \
+                            WI_CloseButton('DKDiv', 'dkf-close') + \
+                            WI_ReturnDiv('DKDiv') + \
+                            WI_FormEnd()
 
-				IKForm = WI_FormInit('Import keys:', 'ImportKeys', 'divformik') + \
+                IKForm = WI_FormInit('Import keys:', 'ImportKeys', 'divformik') + \
 "The CSV file must have the following format: '5PrivateKey;Label'<br />" + \
-							WI_InputText('Wallet Directory: ', 'dir', 'ikf-dir', determine_db_dir()) + \
-							WI_InputText('Wallet Filename: ', 'name', 'ikf-name', determine_db_name(), 20) + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="Format: \'privkey;label\', label=\'#Reserve\' to make the key a pool one">CSV file path</span>: ', 'file', 'ikf-file', '', 60) + \
-							WI_Submit('Import keys', 'IKDiv', 'ikf-close', 'ajaxIK') + \
-							WI_CloseButton('IKDiv', 'ikf-close') + \
-							WI_ReturnDiv('IKDiv') + \
-							WI_FormEnd()
+                            WI_InputText('Wallet Directory: ', 'dir', 'ikf-dir', determine_db_dir()) + \
+                            WI_InputText('Wallet Filename: ', 'name', 'ikf-name', determine_db_name(), 20) + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="Format: \'privkey;label\', label=\'#Reserve\' to make the key a pool one">CSV file path</span>: ', 'file', 'ikf-file', '', 60) + \
+                            WI_Submit('Import keys', 'IKDiv', 'ikf-close', 'ajaxIK') + \
+                            WI_CloseButton('IKDiv', 'ikf-close') + \
+                            WI_ReturnDiv('IKDiv') + \
+                            WI_FormEnd()
 
-				DTxForm = WI_FormInit('Dump your transactions to a file:', 'DumpTx', 'divformdtx') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'dt-dir', determine_db_dir()) + \
-							WI_InputText('Wallet Filename: ', 'name', 'dt-name', determine_db_name(), 20) + \
-							WI_InputText('Output file: ', 'file', 'dt-file', '') + \
-							WI_Submit('Dump tx\'s', 'DTxDiv', 'dt-close', 'ajaxDTx') + \
-							WI_CloseButton('DTxDiv', 'dt-close') + \
-							WI_ReturnDiv('DTxDiv') + \
-							WI_FormEnd()
+                DTxForm = WI_FormInit('Dump your transactions to a file:', 'DumpTx', 'divformdtx') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'dt-dir', determine_db_dir()) + \
+                            WI_InputText('Wallet Filename: ', 'name', 'dt-name', determine_db_name(), 20) + \
+                            WI_InputText('Output file: ', 'file', 'dt-file', '') + \
+                            WI_Submit('Dump tx\'s', 'DTxDiv', 'dt-close', 'ajaxDTx') + \
+                            WI_CloseButton('DTxDiv', 'dt-close') + \
+                            WI_ReturnDiv('DTxDiv') + \
+                            WI_FormEnd()
 
-				prehide_ecdsa=""
-				posthide_ecdsa=""
-				if 'ecdsa' in missing_dep:
-					prehide_ecdsa="<span style='display:none;'>"
-					posthide_ecdsa="</span>"
-				InfoForm = WI_FormInit('Get some info about one key'+X_if_else(' and sign/verify messages', 'ecdsa' not in missing_dep,'')+':', 'Info', 'divforminfo') + \
-							WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
-							prehide_ecdsa + WI_InputText('Message: ', 'msg', 'if-msg', '', 30) + posthide_ecdsa + \
-							prehide_ecdsa + WI_InputText('Signature: ', 'sig', 'if-sig', '', 30) + posthide_ecdsa + \
-							prehide_ecdsa + WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30) + posthide_ecdsa + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
-							"Format:<br />" + \
-							WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
-							WI_RadioButton('format', 'hex', 'if-hex', '', ' Hexadecimal, 64 characters long') + \
-							"You want:<br />" + \
-							WI_RadioButton('i-need', '1', 'if-n-info', 'CHECKED', ' Info') + \
-							prehide_ecdsa + WI_RadioButton('i-need', '2', 'if-n-sv', '', ' Sign and verify') + posthide_ecdsa +\
-							prehide_ecdsa + WI_RadioButton('i-need', '3', 'if-n-both', '', ' Both') + posthide_ecdsa + \
-							WI_Submit('Get info', 'InfoDiv', 'if-close', 'ajaxInfo') + \
-							WI_CloseButton('InfoDiv', 'if-close') + \
-							WI_ReturnDiv('InfoDiv') + \
-							WI_FormEnd()
-
-
-				ImportForm = WI_FormInit('Import a key into your wallet:', 'Import', 'divformimport') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'impf-dir', determine_db_dir(), 30) + \
-							WI_InputText('Wallet Filename:', 'name', 'impf-name', determine_db_name(), 20) + \
-							WI_InputText('Key:', 'key', 'impf-key', '', 65) + \
-							WI_InputText('Label:', 'label', 'impf-label', '') + \
-							WI_Checkbox('reserve', 'true', 'impf-reserve', 'onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked"', ' Reserve') + "<br />" + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'impf-vers', '0', 1) + \
-							"Format:<br />" + \
-							WI_Checkbox('format', 'hex', 'impf-hex', '', ' Hexadecimal, instead of base58') + "<br />" + \
-							WI_Checkbox('format', 'cry', 'impf-cry', 'hidden=true', '<!-- Crypt-->') + \
-							WI_Checkbox('format', 'com', 'impf-com', 'hidden=true', '<!--Compressed key-->') + \
-							WI_Submit('Import key', 'ImportDiv', 'impf-close', 'ajaxImport') + \
-							WI_CloseButton('ImportDiv', 'impf-close') + \
-							WI_ReturnDiv('ImportDiv') + \
-							WI_FormEnd()
-#							WI_RadioButton('format', 'reg', 'impf-reg', 'CHECKED', ' Regular, base 58') + \
-#							WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
+                prehide_ecdsa=""
+                posthide_ecdsa=""
+                if 'ecdsa' in missing_dep:
+                    prehide_ecdsa="<span style='display:none;'>"
+                    posthide_ecdsa="</span>"
+                InfoForm = WI_FormInit('Get some info about one key'+X_if_else(' and sign/verify messages', 'ecdsa' not in missing_dep,'')+':', 'Info', 'divforminfo') + \
+                            WI_InputText('Key: ', 'key', 'if-key', '', 60) + \
+                            prehide_ecdsa + WI_InputText('Message: ', 'msg', 'if-msg', '', 30) + posthide_ecdsa + \
+                            prehide_ecdsa + WI_InputText('Signature: ', 'sig', 'if-sig', '', 30) + posthide_ecdsa + \
+                            prehide_ecdsa + WI_InputText('Pubkey: ', 'pubkey', 'if-pubkey', '', 30) + posthide_ecdsa + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'if-vers', '0', 1) + \
+                            "Format:<br />" + \
+                            WI_RadioButton('format', 'reg', 'if-reg', 'CHECKED', ' Regular, base 58') + \
+                            WI_RadioButton('format', 'hex', 'if-hex', '', ' Hexadecimal, 64 characters long') + \
+                            "You want:<br />" + \
+                            WI_RadioButton('i-need', '1', 'if-n-info', 'CHECKED', ' Info') + \
+                            prehide_ecdsa + WI_RadioButton('i-need', '2', 'if-n-sv', '', ' Sign and verify') + posthide_ecdsa +\
+                            prehide_ecdsa + WI_RadioButton('i-need', '3', 'if-n-both', '', ' Both') + posthide_ecdsa + \
+                            WI_Submit('Get info', 'InfoDiv', 'if-close', 'ajaxInfo') + \
+                            WI_CloseButton('InfoDiv', 'if-close') + \
+                            WI_ReturnDiv('InfoDiv') + \
+                            WI_FormEnd()
 
 
-				ImportROForm = WI_FormInit('Import a read-only address (encrypted wallets only):', 'Import', 'divformimportro') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'irof-dir', determine_db_dir(), 30) + \
-							WI_InputText('Wallet Filename:', 'name', 'irof-name', determine_db_name(), 20) + \
-							WI_InputText('Public key (starting with 04): ', 'pub', 'irof-pub', '', 40) + \
-							WI_InputText('Label: ', 'label', 'irof-label', '') + \
-							WI_Submit('Import address', 'ImportDiv', 'irof-close', 'ajaxImportRO') + \
-							WI_CloseButton('ImportRODiv', 'irof-close') + \
-							WI_ReturnDiv('ImportRODiv') + \
-							WI_FormEnd()
-
-				DeleteForm = WI_FormInit('Delete keys from your wallet:', 'Delete', 'divformdelete') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
-							WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="divided by \'-\'">Keys</span>:', 'key', 'd-key', '', 65) + \
-							"Type:<br />" + \
-							WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Keys" to delete them all)') + \
-							WI_RadioButton('d-type', 'key', 'd-r-key', '', ' Bitcoin address') + \
-							WI_Submit('Delete', 'DeleteDiv', 'd-close', 'ajaxDelete') + \
-							WI_CloseButton('DeleteDiv', 'd-close') + \
-							WI_ReturnDiv('DeleteDiv') + \
-							WI_FormEnd()
-
-				ImportTxForm = WI_FormInit('Import a transaction into your wallet:', 'ImportTx', 'divformimporttx') + \
-							WI_InputText('Wallet Directory: ', 'dir', 'it-dir', determine_db_dir(), 40) + \
-							WI_InputText('Wallet Filename:', 'name', 'it-name', determine_db_name()) + \
-							WI_InputText('Txk:', 'key', 'it-txk', '', 65) + \
-							WI_InputText('Txv:', 'label', 'it-txv', '', 65) + \
-							WI_Submit('Import', 'ImportTxDiv', 'it-close', 'ajaxImportTx') + \
-							WI_CloseButton('ImportTxDiv', 'it-close') + \
-							WI_ReturnDiv('ImportTxDiv') + \
-							WI_FormEnd()
-
-				BalanceForm = WI_FormInit('Print the balance of a Bitcoin address:', 'Balance', 'divformbalance') + \
-							WI_InputText('Key:', 'key', 'bf-key', '', 35) + \
-							WI_Submit('Get balance', 'BalanceDiv', 'gb-close', 'ajaxBalance') + \
-							WI_CloseButton('BalanceDiv', 'gb-close') + \
-							WI_ReturnDiv('BalanceDiv') + \
-							WI_FormEnd()
-
-				global CTX_adds, addr_to_keys
-				CTX_adds2=CTX_adds.split('|')+addr_to_keys.keys()
+                ImportForm = WI_FormInit('Import a key into your wallet:', 'Import', 'divformimport') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'impf-dir', determine_db_dir(), 30) + \
+                            WI_InputText('Wallet Filename:', 'name', 'impf-name', determine_db_name(), 20) + \
+                            WI_InputText('Key:', 'key', 'impf-key', '', 65) + \
+                            WI_InputText('Label:', 'label', 'impf-label', '') + \
+                            WI_Checkbox('reserve', 'true', 'impf-reserve', 'onClick="document.getElementById(\'impf-label\').disabled=document.getElementById(\'impf-reserve\').checked"', ' Reserve') + "<br />" + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="0 for Bitcoin, 52 for Namecoin, 111 for testnets">Version</span>:', 'vers', 'impf-vers', '0', 1) + \
+                            "Format:<br />" + \
+                            WI_Checkbox('format', 'hex', 'impf-hex', '', ' Hexadecimal, instead of base58') + "<br />" + \
+                            WI_Checkbox('format', 'cry', 'impf-cry', 'hidden=true', '<!-- Crypt-->') + \
+                            WI_Checkbox('format', 'com', 'impf-com', 'hidden=true', '<!--Compressed key-->') + \
+                            WI_Submit('Import key', 'ImportDiv', 'impf-close', 'ajaxImport') + \
+                            WI_CloseButton('ImportDiv', 'impf-close') + \
+                            WI_ReturnDiv('ImportDiv') + \
+                            WI_FormEnd()
+#                           WI_RadioButton('format', 'reg', 'impf-reg', 'CHECKED', ' Regular, base 58') + \
+#                           WI_RadioButton('format', 'hex', 'impf-hex', '', ' Hexadecimal, 64 characters long') + \
 
 
-				CreateTxForm = WI_FormInit('Create transaction', 'CTX', 'divformctx') + \
-							X_if_else("Additional addresses used: " + ', '.join(CTX_adds.split('|'))+"<br /><br />",len(CTX_adds)>0,"No additional addresses used<br /><br />") + \
-							listtx_txt(CTX_adds) + \
-							WI_FormEnd()
+                ImportROForm = WI_FormInit('Import a read-only address (encrypted wallets only):', 'Import', 'divformimportro') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'irof-dir', determine_db_dir(), 30) + \
+                            WI_InputText('Wallet Filename:', 'name', 'irof-name', determine_db_name(), 20) + \
+                            WI_InputText('Public key (starting with 04): ', 'pub', 'irof-pub', '', 40) + \
+                            WI_InputText('Label: ', 'label', 'irof-label', '') + \
+                            WI_Submit('Import address', 'ImportDiv', 'irof-close', 'ajaxImportRO') + \
+                            WI_CloseButton('ImportRODiv', 'irof-close') + \
+                            WI_ReturnDiv('ImportRODiv') + \
+                            WI_FormEnd()
 
-				CreateTxForm2 = WI_FormInit('Check addresses funds', 'ListTransactions', 'divformctx') + \
-							WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="Divided by a |">Addresses</span>: ', 'adds', 'ctx-adds', '', 35) + \
-							WI_Submit('Check ', '', '', 'ajaxCTx') + \
-							WI_FormEnd()
+                DeleteForm = WI_FormInit('Delete keys from your wallet:', 'Delete', 'divformdelete') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'd-dir', determine_db_dir(), 40) + \
+                            WI_InputText('Wallet Filename:', 'name', 'd-name', determine_db_name()) + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="divided by \'-\'">Keys</span>:', 'key', 'd-key', '', 65) + \
+                            "Type:<br />" + \
+                            WI_RadioButton('d-type', 'tx', 'd-r-tx', 'CHECKED', ' Transaction (type "all" in "Keys" to delete them all)') + \
+                            WI_RadioButton('d-type', 'key', 'd-r-key', '', ' Bitcoin address') + \
+                            WI_Submit('Delete', 'DeleteDiv', 'd-close', 'ajaxDelete') + \
+                            WI_CloseButton('DeleteDiv', 'd-close') + \
+                            WI_ReturnDiv('DeleteDiv') + \
+                            WI_FormEnd()
 
-				Misc = ''
+                ImportTxForm = WI_FormInit('Import a transaction into your wallet:', 'ImportTx', 'divformimporttx') + \
+                            WI_InputText('Wallet Directory: ', 'dir', 'it-dir', determine_db_dir(), 40) + \
+                            WI_InputText('Wallet Filename:', 'name', 'it-name', determine_db_name()) + \
+                            WI_InputText('Txk:', 'key', 'it-txk', '', 65) + \
+                            WI_InputText('Txv:', 'label', 'it-txv', '', 65) + \
+                            WI_Submit('Import', 'ImportTxDiv', 'it-close', 'ajaxImportTx') + \
+                            WI_CloseButton('ImportTxDiv', 'it-close') + \
+                            WI_ReturnDiv('ImportTxDiv') + \
+                            WI_FormEnd()
 
-				Javascript = '<script language="javascript" type="text/javascript">interv1=0;\
-					totalin=0;\
-					totalout=0;\
-					\
-					function majfee(){\
-						document.getElementById("tot_in").innerHTML=(totalin)/100000000;\
-						document.getElementById("tot_out").innerHTML=(totalout)/100000000;\
-						document.getElementById("tot_fee").innerHTML=(totalin-totalout)/100000000;\
-					}\
-					\
-					function image_showdiv(a){\
-						if(document.getElementById(a).style.display!="none")r="http://creation-entreprise.comprendrechoisir.com/img/puce_tab_down.png";\
-						else{\
-						r="http://creation-entreprise.comprendrechoisir.com/img/puce_tab.png";}\
-						\
-						return "<img src=\'"+r+"\' />";\
-						\
-					}\
-					function get_radio_value(radioform){\
-						var rad_val;\
-						for (var i=0; i < radioform.length; i++){\
-							if (radioform[i].checked){\
-								rad_val = radioform[i].value;\
-							}\
-						}\
-						return rad_val;\
-					}' + \
-				WI_AjaxFunction('UpdatePyw', 'document.getElementById("uptodate").innerHTML = ajaxRequest.responseText;setTimeout(function() {window.location.reload();}, 2000);', '"/?update=1"', 'document.getElementById("uptodate").innerHTML = "Updating...";') + \
-				WI_AjaxFunction('CTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ListTransactions?addresses="+document.getElementById("ctx-adds").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('CPP', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ChangePP?pp="+document.getElementById("cppf-pp").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('DW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&bal="+document.getElementById("dwf-bal").checked+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('MW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/MergeWallets?dir1="+document.getElementById("mwf-dir1").value+"&name1="+document.getElementById("mwf-name1").value+"&pass1="+encodeURIComponent(document.getElementById("mwf-pass1").value)+"&dir2="+document.getElementById("mwf-dir2").value+"&name2="+document.getElementById("mwf-name2").value+"&pass2="+encodeURIComponent(document.getElementById("mwf-pass2").value)+"&dirm="+document.getElementById("mwf-dirm").value+"&namem="+document.getElementById("mwf-namem").value+"&passm1="+encodeURIComponent(document.getElementById("mwf-passm1").value)+"&passm2="+encodeURIComponent(document.getElementById("mwf-passm2").value)+""', 'document.getElementById("retour-pyw").innerHTML = "Merging wallets... This may take a few minutes.";interv1=setInterval(ajaxUpdateMW,300);') + \
-				WI_AjaxFunction('UpdateMW', 'if(ajaxRequest.responseText.length>0){document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;}else{clearInterval(interv1);}', '"/Others?action=update_mwdiv"', '') + \
-				WI_AjaxFunction('DK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dkf-dir").value+"&filetw="+document.getElementById("dkf-file").value+"&keys="+document.getElementById("dkf-keys").value+"&bal="+document.getElementById("dkf-bal").checked+"&name="+document.getElementById("dkf-name").value+"&version="+document.getElementById("dkf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('IK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("ikf-dir").value+"&file="+document.getElementById("ikf-file").value+"&name="+document.getElementById("ikf-name").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('DTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Import', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&com="+document.getElementById("impf-com").checked+"&cry="+document.getElementById("impf-cry").checked+"&format="+document.getElementById("impf-hex").checked+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('Delete', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				WI_AjaxFunction('ImportTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
-				'</script>'
+                BalanceForm = WI_FormInit('Print the balance of a Bitcoin address:', 'Balance', 'divformbalance') + \
+                            WI_InputText('Key:', 'key', 'bf-key', '', 35) + \
+                            WI_Submit('Get balance', 'BalanceDiv', 'gb-close', 'ajaxBalance') + \
+                            WI_CloseButton('BalanceDiv', 'gb-close') + \
+                            WI_ReturnDiv('BalanceDiv') + \
+                            WI_FormEnd()
 
-#				WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+                global CTX_adds, addr_to_keys
+                CTX_adds2=CTX_adds.split('|')+addr_to_keys.keys()
 
 
-				page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + CPPForm + DWForm + MWForm + DKForm + IKForm + DTxForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
+                CreateTxForm = WI_FormInit('Create transaction', 'CTX', 'divformctx') + \
+                            X_if_else("Additional addresses used: " + ', '.join(CTX_adds.split('|'))+"<br /><br />",len(CTX_adds)>0,"No additional addresses used<br /><br />") + \
+                            listtx_txt(CTX_adds) + \
+                            WI_FormEnd()
 
-				AboutPage="\
+                CreateTxForm2 = WI_FormInit('Check addresses funds', 'ListTransactions', 'divformctx') + \
+                            WI_InputText('<span style="border: 0 dashed;border-bottom-width:1px;" title="Divided by a |">Addresses</span>: ', 'adds', 'ctx-adds', '', 35) + \
+                            WI_Submit('Check ', '', '', 'ajaxCTx') + \
+                            WI_FormEnd()
+
+                Misc = ''
+
+                Javascript = '<script language="javascript" type="text/javascript">interv1=0;\
+                    totalin=0;\
+                    totalout=0;\
+                    \
+                    function majfee(){\
+                        document.getElementById("tot_in").innerHTML=(totalin)/100000000;\
+                        document.getElementById("tot_out").innerHTML=(totalout)/100000000;\
+                        document.getElementById("tot_fee").innerHTML=(totalin-totalout)/100000000;\
+                    }\
+                    \
+                    function image_showdiv(a){\
+                        if(document.getElementById(a).style.display!="none")r="http://creation-entreprise.comprendrechoisir.com/img/puce_tab_down.png";\
+                        else{\
+                        r="http://creation-entreprise.comprendrechoisir.com/img/puce_tab.png";}\
+                        \
+                        return "<img src=\'"+r+"\' />";\
+                        \
+                    }\
+                    function get_radio_value(radioform){\
+                        var rad_val;\
+                        for (var i=0; i < radioform.length; i++){\
+                            if (radioform[i].checked){\
+                                rad_val = radioform[i].value;\
+                            }\
+                        }\
+                        return rad_val;\
+                    }' + \
+                WI_AjaxFunction('UpdatePyw', 'document.getElementById("uptodate").innerHTML = ajaxRequest.responseText;setTimeout(function() {window.location.reload();}, 2000);', '"/?update=1"', 'document.getElementById("uptodate").innerHTML = "Updating...";') + \
+                WI_AjaxFunction('CTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ListTransactions?addresses="+document.getElementById("ctx-adds").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('CPP', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ChangePP?pp="+document.getElementById("cppf-pp").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('DW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dwf-dir").value+"&name="+document.getElementById("dwf-name").value+"&bal="+document.getElementById("dwf-bal").checked+"&version="+document.getElementById("dwf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('MW', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/MergeWallets?dir1="+document.getElementById("mwf-dir1").value+"&name1="+document.getElementById("mwf-name1").value+"&pass1="+encodeURIComponent(document.getElementById("mwf-pass1").value)+"&dir2="+document.getElementById("mwf-dir2").value+"&name2="+document.getElementById("mwf-name2").value+"&pass2="+encodeURIComponent(document.getElementById("mwf-pass2").value)+"&dirm="+document.getElementById("mwf-dirm").value+"&namem="+document.getElementById("mwf-namem").value+"&passm1="+encodeURIComponent(document.getElementById("mwf-passm1").value)+"&passm2="+encodeURIComponent(document.getElementById("mwf-passm2").value)+""', 'document.getElementById("retour-pyw").innerHTML = "Merging wallets... This may take a few minutes.";interv1=setInterval(ajaxUpdateMW,300);') + \
+                WI_AjaxFunction('UpdateMW', 'if(ajaxRequest.responseText.length>0){document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;}else{clearInterval(interv1);}', '"/Others?action=update_mwdiv"', '') + \
+                WI_AjaxFunction('DK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpWallet?dir="+document.getElementById("dkf-dir").value+"&filetw="+document.getElementById("dkf-file").value+"&keys="+document.getElementById("dkf-keys").value+"&bal="+document.getElementById("dkf-bal").checked+"&name="+document.getElementById("dkf-name").value+"&version="+document.getElementById("dkf-vers").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('IK', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("ikf-dir").value+"&file="+document.getElementById("ikf-file").value+"&name="+document.getElementById("ikf-name").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('DTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/DumpTx?dir="+document.getElementById("dt-dir").value+"&name="+document.getElementById("dt-name").value+"&file="+document.getElementById("dt-file").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('Info', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Info?key="+document.getElementById("if-key").value+"&msg="+document.getElementById("if-msg").value+"&pubkey="+document.getElementById("if-pubkey").value+"&sig="+document.getElementById("if-sig").value+"&vers="+document.getElementById("if-vers").value+"&format="+(document.getElementById("if-hex").checked?"hex":"reg")+"&need="+get_radio_value(document.getElementsByName("i-need"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('Import', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&com="+document.getElementById("impf-com").checked+"&cry="+document.getElementById("impf-cry").checked+"&format="+document.getElementById("impf-hex").checked+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('ImportRO', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("irof-dir").value+"&name="+document.getElementById("irof-name").value+"&pub="+document.getElementById("irof-pub").value+"&label="+document.getElementById("irof-label").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('Balance', 'document.getElementById("retour-pyw").innerHTML = "Balance of " + document.getElementById("bf-key").value + ": " + ajaxRequest.responseText;', '"/Balance?key="+document.getElementById("bf-key").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('Delete', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/Delete?dir="+document.getElementById("d-dir").value+"&name="+document.getElementById("d-name").value+"&keydel="+document.getElementById("d-key").value+"&typedel="+get_radio_value(document.getElementsByName("d-type"))', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                WI_AjaxFunction('ImportTx', 'document.getElementById("retour-pyw").innerHTML = ajaxRequest.responseText;', '"/ImportTx?dir="+document.getElementById("it-dir").value+"&name="+document.getElementById("it-name").value+"&txk="+document.getElementById("it-txk").value+"&txv="+document.getElementById("it-txv").value', 'document.getElementById("retour-pyw").innerHTML = "Loading...";') + \
+                '</script>'
+
+#               WI_AjaxFunction('Import', 'document.getElementById("ImportDiv").innerHTML = ajaxRequest.responseText;', '"/Import?dir="+document.getElementById("impf-dir").value+"&name="+document.getElementById("impf-name").value+"&key="+document.getElementById("impf-key").value+"&label="+document.getElementById("impf-label").value+"&vers="+document.getElementById("impf-vers").value+"&format="+(document.getElementById("impf-hex").checked?"hex":"reg")+(document.getElementById("impf-reserve").checked?"&reserve=1":"")', 'document.getElementById("ImportDiv").innerHTML = "Loading...";') + \
+
+
+                page = '<html><head><title>Pywallet Web Interface</title></head><body>' + header + Javascript + CPPForm + DWForm + MWForm + DKForm + IKForm + DTxForm + InfoForm + ImportForm + ImportTxForm + DeleteForm + BalanceForm + Misc + '</body></html>'
+
+                AboutPage="\
 Pywallet is a tool to manage wallet files, developped by jackjack. <a href='https://bitcointalk.org/index.php?topic=34028'>Support thread</a> is on bitcointalk.<br />\
 <br />\
 To support pywallet's development or if you think it's worth something, you can send anything you want to 1AQDfx22pKGgXnUZFL1e4UKos3QqvRzNh5.\
 \
 <br /><br /><br /><br /><b>Dependencies:</b><br />\
-				\
-				&nbsp;&nbsp;&nbsp;ecdsa: "+dep_text_aboutpage('ecdsa' in missing_dep)+"\
-				\
+                \
+                &nbsp;&nbsp;&nbsp;ecdsa: "+dep_text_aboutpage('ecdsa' in missing_dep)+"\
+                \
 <br /><br /><b>Pywallet path:</b>&nbsp;&nbsp;&nbsp;"+pyw_path+"/"+pyw_filename+"\
-				"
+                "
 
-				return html_wui(Javascript + \
-					WI_Endiv(DWForm+DKForm+DTxForm, 'DumpPage', 'Dump', '') + \
-					WI_Endiv(ImportForm+IKForm+MWForm+ImportTxForm+ImportROForm,'ImportPage', 'Import', "Don't forget to close Bitcoin when you modify your wallet", True) + \
-					WI_Endiv(DeleteForm,'DeletePage', 'Delete', "Don't forget to close Bitcoin when you modify your wallet", True) + \
-					WI_Endiv(CPPForm,'PassphrasePage', 'Change passphrase', '', True) + \
-					WI_Endiv(InfoForm+BalanceForm,'InfoPage', 'Info', '', True) + \
-					WI_Endiv(CreateTxForm2+CreateTxForm,'TxPage', 'Manage transactions', 'You can here create your own transactions. <br />By default, the unspent transactions from addresses previously dumped are shown, but you can add other addresses to check.<br />You can\'t create a transaction if you didn\'t dump the private keys of each input beforehand.', True) + \
-					WI_Endiv(AboutPage,'AboutPage','About','', True)
-				,check_version_text
-				)
+                return html_wui(Javascript + \
+                    WI_Endiv(DWForm+DKForm+DTxForm, 'DumpPage', 'Dump', '') + \
+                    WI_Endiv(ImportForm+IKForm+MWForm+ImportTxForm+ImportROForm,'ImportPage', 'Import', "Don't forget to close Bitcoin when you modify your wallet", True) + \
+                    WI_Endiv(DeleteForm,'DeletePage', 'Delete', "Don't forget to close Bitcoin when you modify your wallet", True) + \
+                    WI_Endiv(CPPForm,'PassphrasePage', 'Change passphrase', '', True) + \
+                    WI_Endiv(InfoForm+BalanceForm,'InfoPage', 'Info', '', True) + \
+                    WI_Endiv(CreateTxForm2+CreateTxForm,'TxPage', 'Manage transactions', 'You can here create your own transactions. <br />By default, the unspent transactions from addresses previously dumped are shown, but you can add other addresses to check.<br />You can\'t create a transaction if you didn\'t dump the private keys of each input beforehand.', True) + \
+                    WI_Endiv(AboutPage,'AboutPage','About','', True)
+                ,check_version_text
+                )
 
 
-				return page
+                return page
 
-		 def getChild(self, name, request):
-			 if name == '':
-				 return self
-			 else:
-				 if name in VIEWS.keys():
-					 return resource.Resource.getChild(self, name, request)
-				 else:
-					 return WI404()
+         def getChild(self, name, request):
+             if name == '':
+                 return self
+             else:
+                 if name in VIEWS.keys():
+                     return resource.Resource.getChild(self, name, request)
+                 else:
+                     return WI404()
 
-	class WIDumpWallet(resource.Resource):
+    class WIDumpWallet(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
+         def render_GET(self, request):
+             try:
 
-					wdir=request.args['dir'][0]
-					wname=request.args['name'][0]
-					version = int(request.args['version'][0])
-					log.msg('Wallet Dir: %s' %(wdir))
-					log.msg('Wallet Name: %s' %(wname))
+                    wdir=request.args['dir'][0]
+                    wname=request.args['name'][0]
+                    version = int(request.args['version'][0])
+                    log.msg('Wallet Dir: %s' %(wdir))
+                    log.msg('Wallet Name: %s' %(wname))
 
-					if not os.path.isfile(wdir+"/"+wname):
-						return '%s/%s doesn\'t exist'%(wdir, wname)
+                    if not os.path.isfile(wdir+"/"+wname):
+                        return '%s/%s doesn\'t exist'%(wdir, wname)
 
-					try:
-						bal=request.args['bal'][0]=='true'
-					except:
-						bal=false
-					read_wallet(json_db, create_env(wdir), wname, True, True, "", bal, version)
+                    try:
+                        bal=request.args['bal'][0]=='true'
+                    except:
+                        bal=false
+                    read_wallet(json_db, create_env(wdir), wname, True, True, "", bal, version)
 
-#					print wdir
-#					print wname
-#					print json_db  #json.dumps(json_db, sort_keys=True, indent=4)
+#                   print wdir
+#                   print wname
+#                   print json_db  #json.dumps(json_db, sort_keys=True, indent=4)
 
-					try:
-						kfile=request.args['filetw'][0]
-						kkeys=request.args['keys'][0]
-#						print kkeys.split(',')
-						reteak=export_all_keys(json_db, kkeys.split(','), kfile)
-						return 'File'+X_if_else("",reteak," not")+' written'
-					except:
-						return 'Wallet: %s/%s<br />Dump:<pre>%s</pre>'%(wdir, wname, json.dumps(json_db, sort_keys=True, indent=4))
-			 except:
-				 log.err()
-				 return 'Error in dump page'
+                    try:
+                        kfile=request.args['filetw'][0]
+                        kkeys=request.args['keys'][0]
+#                       print kkeys.split(',')
+                        reteak=export_all_keys(json_db, kkeys.split(','), kfile)
+                        return 'File'+X_if_else("",reteak," not")+' written'
+                    except:
+                        return 'Wallet: %s/%s<br />Dump:<pre>%s</pre>'%(wdir, wname, json.dumps(json_db, sort_keys=True, indent=4))
+             except:
+                 log.err()
+                 return 'Error in dump page'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIDumpTx(resource.Resource):
+    class WIDumpTx(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-					wdir=request.args['dir'][0]
-					wname=request.args['name'][0]
-					jsonfile=request.args['file'][0]
-					log.msg('Wallet Dir: %s' %(wdir))
-					log.msg('Wallet Name: %s' %(wname))
+         def render_GET(self, request):
+             try:
+                    wdir=request.args['dir'][0]
+                    wname=request.args['name'][0]
+                    jsonfile=request.args['file'][0]
+                    log.msg('Wallet Dir: %s' %(wdir))
+                    log.msg('Wallet Name: %s' %(wname))
 
-					if not os.path.isfile(wdir+"/"+wname):
-						return '%s/%s doesn\'t exist'%(wdir, wname)
-					if os.path.isfile(jsonfile):
-						return '%s exists'%(jsonfile)
+                    if not os.path.isfile(wdir+"/"+wname):
+                        return '%s/%s doesn\'t exist'%(wdir, wname)
+                    if os.path.isfile(jsonfile):
+                        return '%s exists'%(jsonfile)
 
-					read_wallet(json_db, create_env(wdir), wname, True, True, "", None)
-					write_jsonfile(jsonfile, json_db['tx'])
-					return 'Wallet: %s/%s<br />Transations dumped in %s'%(wdir, wname, jsonfile)
-			 except:
-				 log.err()
-				 return 'Error in dumptx page'
+                    read_wallet(json_db, create_env(wdir), wname, True, True, "", None)
+                    write_jsonfile(jsonfile, json_db['tx'])
+                    return 'Wallet: %s/%s<br />Transations dumped in %s'%(wdir, wname, jsonfile)
+             except:
+                 log.err()
+                 return 'Error in dumptx page'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIMergeWallets(resource.Resource):
+    class WIMergeWallets(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-				dir1=request.args['dir1'][0]
-				name1=request.args['name1'][0]
-				pass1=request.args['pass1'][0]
-				dir2=request.args['dir2'][0]
-				name2=request.args['name2'][0]
-				pass2=request.args['pass2'][0]
-				dirm=request.args['dirm'][0]
-				namem=request.args['namem'][0]
-				passm1=request.args['passm1'][0]
-				passm2=request.args['passm2'][0]
-				if passm1!=passm2:
-					return 'The passphrases for the merged wallet don\'t match. Aborted.'
+         def render_GET(self, request):
+             try:
+                dir1=request.args['dir1'][0]
+                name1=request.args['name1'][0]
+                pass1=request.args['pass1'][0]
+                dir2=request.args['dir2'][0]
+                name2=request.args['name2'][0]
+                pass2=request.args['pass2'][0]
+                dirm=request.args['dirm'][0]
+                namem=request.args['namem'][0]
+                passm1=request.args['passm1'][0]
+                passm2=request.args['passm2'][0]
+                if passm1!=passm2:
+                    return 'The passphrases for the merged wallet don\'t match. Aborted.'
 
-				r=merge_wallets(dir1, name1, dir2, name2, dirm, namem, pass1, pass2, passm1)
-				if r[0]:
-					return "Merging in progress..."
-				else:
-					return r[1]
+                r=merge_wallets(dir1, name1, dir2, name2, dirm, namem, pass1, pass2, passm1)
+                if r[0]:
+                    return "Merging in progress..."
+                else:
+                    return r[1]
 
-				return ret
-			 except:
-				 log.err()
-				 return 'Error in mergewallets page'
+                return ret
+             except:
+                 log.err()
+                 return 'Error in mergewallets page'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIChangePP(resource.Resource):
+    class WIChangePP(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-				global passphrase
-				passphrase=request.args['pp'][0]
-				return 'Done'
-			 except:
-				log.err()
-				return 'Error while changing passphrase'
+         def render_GET(self, request):
+             try:
+                global passphrase
+                passphrase=request.args['pp'][0]
+                return 'Done'
+             except:
+                log.err()
+                return 'Error while changing passphrase'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIOthers(resource.Resource):
+    class WIOthers(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-				global passphrase
-				global global_merging_message
+         def render_GET(self, request):
+             try:
+                global passphrase
+                global global_merging_message
 
-				action=request.args['action'][0]
-				if action=="update_mwdiv":
-					ret=global_merging_message[0]
-					global_merging_message[0]=global_merging_message[1]
-					global_merging_message[1]=""
-					return ret
-				return 'Done'
-			 except:
-				log.err()
-				return 'Error while WIOthers'
+                action=request.args['action'][0]
+                if action=="update_mwdiv":
+                    ret=global_merging_message[0]
+                    global_merging_message[0]=global_merging_message[1]
+                    global_merging_message[1]=""
+                    return ret
+                return 'Done'
+             except:
+                log.err()
+                return 'Error while WIOthers'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIBalance(resource.Resource):
+    class WIBalance(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-					return "%s"%str(balance(balance_site, request.args['key'][0]).encode('utf-8'))
-			 except:
-				 log.err()
-				 return 'Error in balance page'
+         def render_GET(self, request):
+             try:
+                    return "%s"%str(balance(balance_site, request.args['key'][0]).encode('utf-8'))
+             except:
+                 log.err()
+                 return 'Error in balance page'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
-	class WIDelete(resource.Resource):
+    class WIDelete(resource.Resource):
 
-		 def render_GET(self, request):
-			 try:
-					wdir=request.args['dir'][0]
-					wname=request.args['name'][0]
-					keydel=request.args['keydel'][0]
-					typedel=request.args['typedel'][0]
-					db_env = create_env(wdir)
+         def render_GET(self, request):
+             try:
+                    wdir=request.args['dir'][0]
+                    wname=request.args['name'][0]
+                    keydel=request.args['keydel'][0]
+                    typedel=request.args['typedel'][0]
+                    db_env = create_env(wdir)
 
-					if not os.path.isfile(wdir+"/"+wname):
-						return '%s/%s doesn\'t exist'%(wdir, wname)
+                    if not os.path.isfile(wdir+"/"+wname):
+                        return '%s/%s doesn\'t exist'%(wdir, wname)
 
-					deleted_items = delete_from_wallet(db_env, wname, typedel, keydel.split('-'))
+                    deleted_items = delete_from_wallet(db_env, wname, typedel, keydel.split('-'))
 
-					return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
+                    return "%s:%s has been successfully deleted from %s/%s, resulting in %d deleted item%s"%(typedel, keydel, wdir, wname, deleted_items, iais(deleted_items))
 
-			 except:
-				 log.err()
-				 return 'Error in delete page'
+             except:
+                 log.err()
+                 return 'Error in delete page'
 
-			 def render_POST(self, request):
-				 return self.render_GET(request)
+             def render_POST(self, request):
+                 return self.render_GET(request)
 
 def message_to_hash(msg, msgIsHex=False):
-	str = ""
-#	str += '04%064x%064x'%(pubkey.point.x(), pubkey.point.y())
-#	str += "Padding text - "
-	str += msg
-	if msgIsHex:
-		str = str.decode('hex')
-	hash = Hash(str)
-	return hash
+    str = ""
+#   str += '04%064x%064x'%(pubkey.point.x(), pubkey.point.y())
+#   str += "Padding text - "
+    str += msg
+    if msgIsHex:
+        str = str.decode('hex')
+    hash = Hash(str)
+    return hash
 
 def sign_message(secret, msg, msgIsHex=False):
-	k = KEY()
-	k.generate(secret)
-	return k.sign(message_to_hash(msg, msgIsHex))
+    k = KEY()
+    k.generate(secret)
+    return k.sign(message_to_hash(msg, msgIsHex))
 
 def verify_message_signature(pubkey, sign, msg, msgIsHex=False):
-	k = KEY()
-	k.set_pubkey(pubkey.decode('hex'))
-	return k.verify(message_to_hash(msg, msgIsHex), sign.decode('hex'))
+    k = KEY()
+    k.set_pubkey(pubkey.decode('hex'))
+    return k.verify(message_to_hash(msg, msgIsHex), sign.decode('hex'))
 
 
 OP_DUP = 118;
@@ -3837,228 +3845,228 @@ XOP_CHECKSIG = "%02x"%OP_CHECKSIG;
 BTC = 1e8
 
 def ct(l_prevh, l_prevn, l_prevsig, l_prevpubkey, l_value_out, l_pubkey_out, is_msg_to_sign=-1, oldScriptPubkey=""):
-	scriptSig = True
-	if is_msg_to_sign is not -1:
-		scriptSig = False
-		index = is_msg_to_sign
+    scriptSig = True
+    if is_msg_to_sign is not -1:
+        scriptSig = False
+        index = is_msg_to_sign
 
-	ret = ""
-	ret += inverse_str("%08x"%1)
-	nvin = len(l_prevh)
-	ret += "%02x"%nvin
+    ret = ""
+    ret += inverse_str("%08x"%1)
+    nvin = len(l_prevh)
+    ret += "%02x"%nvin
 
-	for i in range(nvin):
-		txin_ret = ""
-		txin_ret2 = ""
+    for i in range(nvin):
+        txin_ret = ""
+        txin_ret2 = ""
 
-		txin_ret += inverse_str(l_prevh[i])
-		txin_ret += inverse_str("%08x"%l_prevn[i])
+        txin_ret += inverse_str(l_prevh[i])
+        txin_ret += inverse_str("%08x"%l_prevn[i])
 
-		if scriptSig:
-			txin_ret2 += "%02x"%(1+len(l_prevsig[i])/2)
-			txin_ret2 += l_prevsig[i]
-			txin_ret2 += "01"
-			txin_ret2 += "%02x"%(len(l_prevpubkey[i])/2)
-			txin_ret2 += l_prevpubkey[i]
+        if scriptSig:
+            txin_ret2 += "%02x"%(1+len(l_prevsig[i])/2)
+            txin_ret2 += l_prevsig[i]
+            txin_ret2 += "01"
+            txin_ret2 += "%02x"%(len(l_prevpubkey[i])/2)
+            txin_ret2 += l_prevpubkey[i]
 
-			txin_ret += "%02x"%(len(txin_ret2)/2)
-			txin_ret += txin_ret2
+            txin_ret += "%02x"%(len(txin_ret2)/2)
+            txin_ret += txin_ret2
 
-		elif index == i:
-			txin_ret += "%02x"%(len(oldScriptPubkey)/2)
-			txin_ret += oldScriptPubkey
-		else:
-			txin_ret += "00"
+        elif index == i:
+            txin_ret += "%02x"%(len(oldScriptPubkey)/2)
+            txin_ret += oldScriptPubkey
+        else:
+            txin_ret += "00"
 
-		ret += txin_ret
-		ret += "ffffffff"
+        ret += txin_ret
+        ret += "ffffffff"
 
 
-	nvout = len(l_value_out)
-	ret += "%02x"%nvout
-	for i in range(nvout):
-		txout_ret = ""
+    nvout = len(l_value_out)
+    ret += "%02x"%nvout
+    for i in range(nvout):
+        txout_ret = ""
 
-		txout_ret += inverse_str("%016x"%(l_value_out[i]))
-		txout_ret += "%02x"%(len(l_pubkey_out[i])/2+5)
-		txout_ret += "%02x"%OP_DUP
-		txout_ret += "%02x"%OP_HASH160
-		txout_ret += "%02x"%(len(l_pubkey_out[i])/2)
-		txout_ret += l_pubkey_out[i]
-		txout_ret += "%02x"%OP_EQUALVERIFY
-		txout_ret += "%02x"%OP_CHECKSIG
-		ret += txout_ret
+        txout_ret += inverse_str("%016x"%(l_value_out[i]))
+        txout_ret += "%02x"%(len(l_pubkey_out[i])/2+5)
+        txout_ret += "%02x"%OP_DUP
+        txout_ret += "%02x"%OP_HASH160
+        txout_ret += "%02x"%(len(l_pubkey_out[i])/2)
+        txout_ret += l_pubkey_out[i]
+        txout_ret += "%02x"%OP_EQUALVERIFY
+        txout_ret += "%02x"%OP_CHECKSIG
+        ret += txout_ret
 
-	ret += "00000000"
-	if not scriptSig:
-		ret += "01000000"
-	return ret
+    ret += "00000000"
+    if not scriptSig:
+        ret += "01000000"
+    return ret
 
 def create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevScriptPubKey, amounts_txout, scriptPubkey):
-	li1 = len(secret_key)
-	li2 = len(hashes_txin)
-	li3 = len(indexes_txin)
-	li4 = len(pubkey_txin)
-	li5 = len(prevScriptPubKey)
+    li1 = len(secret_key)
+    li2 = len(hashes_txin)
+    li3 = len(indexes_txin)
+    li4 = len(pubkey_txin)
+    li5 = len(prevScriptPubKey)
 
-	if li1 != li2 or li2 != li3 or li3 != li4 or li4 != li5:
-		print("Error in the number of tx inputs")
-		exit(0)
+    if li1 != li2 or li2 != li3 or li3 != li4 or li4 != li5:
+        print("Error in the number of tx inputs")
+        exit(0)
 
-	lo1 = len(amounts_txout)
-	lo2 = len(scriptPubkey)
+    lo1 = len(amounts_txout)
+    lo2 = len(scriptPubkey)
 
-	if lo1 != lo2:
-		print("Error in the number of tx outputs")
-		exit(0)
+    if lo1 != lo2:
+        print("Error in the number of tx outputs")
+        exit(0)
 
-	sig_txin = []
-	i=0
-	for cpt in hashes_txin:
-		sig_txin.append(sign_message(secret_key[i].decode('hex'), ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey, i, prevScriptPubKey[i]), True)+"01")
-		i+=1
+    sig_txin = []
+    i=0
+    for cpt in hashes_txin:
+        sig_txin.append(sign_message(secret_key[i].decode('hex'), ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey, i, prevScriptPubKey[i]), True)+"01")
+        i+=1
 
-	tx = ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey)
-	hashtx = Hash(tx.decode('hex')).encode('hex')
+    tx = ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey)
+    hashtx = Hash(tx.decode('hex')).encode('hex')
 
-	for i in range(len(sig_txin)):
-		try:
-			verify_message_signature(pubkey_txin[i], sig_txin[i][:-2], ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey, i, prevScriptPubKey[i]), True)
-			print("sig %2d: verif ok"%i)
-		except:
-			print("sig %2d: verif error"%i)
-			exit(0)
+    for i in range(len(sig_txin)):
+        try:
+            verify_message_signature(pubkey_txin[i], sig_txin[i][:-2], ct(hashes_txin, indexes_txin, sig_txin, pubkey_txin, amounts_txout, scriptPubkey, i, prevScriptPubKey[i]), True)
+            print("sig %2d: verif ok"%i)
+        except:
+            print("sig %2d: verif error"%i)
+            exit(0)
 
-#	tx += end_of_wallettx([], int(time.time()))
-#	return [inverse_str(hashtx), "027478" + hashtx, tx]
-	return [inverse_str(hashtx), "", tx]
+#   tx += end_of_wallettx([], int(time.time()))
+#   return [inverse_str(hashtx), "027478" + hashtx, tx]
+    return [inverse_str(hashtx), "", tx]
 
 def inverse_str(string):
-	ret = ""
-	for i in range(len(string)/2):
-		ret += string[len(string)-2-2*i];
-		ret += string[len(string)-2-2*i+1];
-	return ret
+    ret = ""
+    for i in range(len(string)/2):
+        ret += string[len(string)-2-2*i];
+        ret += string[len(string)-2-2*i+1];
+    return ret
 
 def read_table(table, beg, end):
-	rows = table.split(beg)
-	for i in range(len(rows)):
-		rows[i] = rows[i].split(end)[0]
-	return rows
+    rows = table.split(beg)
+    for i in range(len(rows)):
+        rows[i] = rows[i].split(end)[0]
+    return rows
 
 def read_blockexplorer_table(table):
-	cell = []
-	rows = read_table(table, '<tr>', '</tr>')
-	for i in range(len(rows)):
-		cell.append(read_table(rows[i], '<td>', '</td>'))
-		del cell[i][0]
-	del cell[0]
-	del cell[0]
-	return cell
+    cell = []
+    rows = read_table(table, '<tr>', '</tr>')
+    for i in range(len(rows)):
+        cell.append(read_table(rows[i], '<td>', '</td>'))
+        del cell[i][0]
+    del cell[0]
+    del cell[0]
+    return cell
 
 txin_amounts = {}
 
 def bc_address_to_available_tx(address, testnet=False):
-	TN=""
-	if testnet:
-		TN="testnet"
+    TN=""
+    if testnet:
+        TN="testnet"
 
-	blockexplorer_url = "http://blockexplorer.com/"+TN+"/address/"
-	ret = ""
-	txin = []
-	txin_no = {}
-	global txin_amounts
-	txout = []
-	balance = 0
-	txin_is_used = {}
+    blockexplorer_url = "http://blockexplorer.com/"+TN+"/address/"
+    ret = ""
+    txin = []
+    txin_no = {}
+    global txin_amounts
+    txout = []
+    balance = 0
+    txin_is_used = {}
 
-	page = urllib.urlopen("%s/%s" % (blockexplorer_url, address))
-	try:
-		table = page.read().split('<table class="txtable">')[1]
-		table = table.split("</table>")[0]
-	except:
-		return {address:[]}
+    page = urllib.urlopen("%s/%s" % (blockexplorer_url, address))
+    try:
+        table = page.read().split('<table class="txtable">')[1]
+        table = table.split("</table>")[0]
+    except:
+        return {address:[]}
 
-	cell = read_blockexplorer_table(table)
+    cell = read_blockexplorer_table(table)
 
-	for i in range(len(cell)):
-		txhash = read_table(cell[i][0], '/tx/', '#')[1]
-		post_hash = read_table(cell[i][0], '#', '">')[1]
-		io = post_hash[0]
-		no_tx = post_hash[1:]
-		if io in 'i':
-			txout.append([txhash, post_hash])
-		else:
-			txin.append(txhash+no_tx)
-			txin_no[txhash+no_tx] = post_hash[1:]
-			txin_is_used[txhash+no_tx] = 0
+    for i in range(len(cell)):
+        txhash = read_table(cell[i][0], '/tx/', '#')[1]
+        post_hash = read_table(cell[i][0], '#', '">')[1]
+        io = post_hash[0]
+        no_tx = post_hash[1:]
+        if io in 'i':
+            txout.append([txhash, post_hash])
+        else:
+            txin.append(txhash+no_tx)
+            txin_no[txhash+no_tx] = post_hash[1:]
+            txin_is_used[txhash+no_tx] = 0
 
-		#hashblock = read_table(cell[i][1], '/block/', '">')[1]
-		#blocknumber = read_table(cell[i][1], 'Block ', '</a>')[1]
+        #hashblock = read_table(cell[i][1], '/block/', '">')[1]
+        #blocknumber = read_table(cell[i][1], 'Block ', '</a>')[1]
 
-		txin_amounts[txhash+no_tx] = round(float(cell[i][2]), 8)
+        txin_amounts[txhash+no_tx] = round(float(cell[i][2]), 8)
 
-#		if cell[i][3][:4] in 'Sent' and io in 'o':
-#			print(cell[i][3][:4])
-#			print(io)
-#			return 'error'
-#		if cell[i][3][:4] in 'Rece' and io in 'i':
-#			print(cell[i][3][:4])
-#			print(io)
-#			return 'error'
+#       if cell[i][3][:4] in 'Sent' and io in 'o':
+#           print(cell[i][3][:4])
+#           print(io)
+#           return 'error'
+#       if cell[i][3][:4] in 'Rece' and io in 'i':
+#           print(cell[i][3][:4])
+#           print(io)
+#           return 'error'
 
-		balance = round(float(cell[i][5]), 8)
+        balance = round(float(cell[i][5]), 8)
 
 
-	for tx in txout:
-		pagetx = urllib.urlopen("http://blockexplorer.com/"+TN+"/tx/"+tx[0])
-		table_in = pagetx.read().split('<a name="outputs">Outputs</a>')[0].split('<table class="txtable">')[1].split("</table>")[0]
+    for tx in txout:
+        pagetx = urllib.urlopen("http://blockexplorer.com/"+TN+"/tx/"+tx[0])
+        table_in = pagetx.read().split('<a name="outputs">Outputs</a>')[0].split('<table class="txtable">')[1].split("</table>")[0]
 
-		cell = read_blockexplorer_table(table_in)
-		for i in range(len(cell)):
-			txhash = read_table(cell[i][0], '/tx/', '#')[1]
-			no_tx = read_table(cell[i][0], '#', '">')[1][1:]
+        cell = read_blockexplorer_table(table_in)
+        for i in range(len(cell)):
+            txhash = read_table(cell[i][0], '/tx/', '#')[1]
+            no_tx = read_table(cell[i][0], '#', '">')[1][1:]
 
-			if txhash+no_tx in txin:
-				txin_is_used[txhash+no_tx] = 1
+            if txhash+no_tx in txin:
+                txin_is_used[txhash+no_tx] = 1
 
-	ret = []
-	for tx in txin:
-		if not txin_is_used[tx]:
-			ret.append([tx,txin_amounts[tx],txin_no[tx]])
+    ret = []
+    for tx in txin:
+        if not txin_is_used[tx]:
+            ret.append([tx,txin_amounts[tx],txin_no[tx]])
 
-	return {address : ret}
+    return {address : ret}
 
 def write_avtx(list_avtx, testnet=False):
-	TN=""
-	if testnet:
-		TN="testnet"
-	gret = "<table border=1>"
-	for add in list_avtx:
-		notnull = False
-		try:
-			hexsec = " -> " + bc_address_to_sec[add]
-		except:
-			hexsec = ""
-		ret = '<tr><td colspan=3 align="center" rowspan=1><a href="http://blockexplorer.com/'+TN+'/address/' +add + '">' + add + "</a>" + hexsec + '</td></tr>'
-		a = list_avtx[add]
-		for array in a:
-			notnull = True
-			no_tx = array[0][64:]
-			array[0] = array[0][:64]
-			link = "http://blockexplorer.com/"+TN+"/rawtx/"+array[0]
-			pagetx = urllib.urlopen(link)
-			ScriptPubkey = str(json.loads(pagetx.read())['out'][int(array[2])]['scriptPubKey'])
-#			ret += '<a href="http://blockexplorer.com/tx/' +array[0] + '">' + array[0] + "#" + no_tx + "</a>: " + str(array[1]) + " & " + ScriptPubkey + "<br />"
-			ret += '<tr><td><a href="http://blockexplorer.com/'+TN+'/tx/' +array[0] + '#' + no_tx + '">' + array[0] + "</a></td><td>" + str(array[1]) + "</td><td>" + ScriptPubkey + "</td></tr>"
-		ret+="<tr><td colspan=3></td></tr>"
-#		ret += "<br />" + "<br />"
-		if notnull is False:
-			ret = ""
-		gret += ret
-	gret=gret[:-len("<tr><td colspan=3></td></tr>")]
+    TN=""
+    if testnet:
+        TN="testnet"
+    gret = "<table border=1>"
+    for add in list_avtx:
+        notnull = False
+        try:
+            hexsec = " -> " + bc_address_to_sec[add]
+        except:
+            hexsec = ""
+        ret = '<tr><td colspan=3 align="center" rowspan=1><a href="http://blockexplorer.com/'+TN+'/address/' +add + '">' + add + "</a>" + hexsec + '</td></tr>'
+        a = list_avtx[add]
+        for array in a:
+            notnull = True
+            no_tx = array[0][64:]
+            array[0] = array[0][:64]
+            link = "http://blockexplorer.com/"+TN+"/rawtx/"+array[0]
+            pagetx = urllib.urlopen(link)
+            ScriptPubkey = str(json.loads(pagetx.read())['out'][int(array[2])]['scriptPubKey'])
+#           ret += '<a href="http://blockexplorer.com/tx/' +array[0] + '">' + array[0] + "#" + no_tx + "</a>: " + str(array[1]) + " & " + ScriptPubkey + "<br />"
+            ret += '<tr><td><a href="http://blockexplorer.com/'+TN+'/tx/' +array[0] + '#' + no_tx + '">' + array[0] + "</a></td><td>" + str(array[1]) + "</td><td>" + ScriptPubkey + "</td></tr>"
+        ret+="<tr><td colspan=3></td></tr>"
+#       ret += "<br />" + "<br />"
+        if notnull is False:
+            ret = ""
+        gret += ret
+    gret=gret[:-len("<tr><td colspan=3></td></tr>")]
 
-	return gret+"</table>"
+    return gret+"</table>"
 
 ct_txin = []
 ct_txout = []
@@ -4068,981 +4076,1010 @@ empty_txin={'hash':'', 'index':'', 'sig':'##', 'pubkey':'', 'oldscript':'', 'add
 empty_txout={'amount':'', 'script':''}
 
 class tx():
-	ins=[]
-	outs=[]
-	tosign=False
+    ins=[]
+    outs=[]
+    tosign=False
 
-	def hashtypeone(index,script):
-		global empty_txin
-		for i in range(len(ins)):
-			self.ins[i]=empty_txin
-		self.ins[index]['pubkey']=""
-		self.ins[index]['oldscript']=s
-		self.tosign=True
+    def hashtypeone(index,script):
+        global empty_txin
+        for i in range(len(ins)):
+            self.ins[i]=empty_txin
+        self.ins[index]['pubkey']=""
+        self.ins[index]['oldscript']=s
+        self.tosign=True
 
-	def copy():
-		r=tx()
-		r.ins=self.ins[:]
-		r.outs=self.outs[:]
-		return r
+    def copy():
+        r=tx()
+        r.ins=self.ins[:]
+        r.outs=self.outs[:]
+        return r
 
-	def sign(n=-1):
-		if n==-1:
-			for i in range(len(ins)):
-				self.sign(i)
-				return "done"
+    def sign(n=-1):
+        if n==-1:
+            for i in range(len(ins)):
+                self.sign(i)
+                return "done"
 
-		global json_db
-		txcopy=self.copy()
-		txcopy.hashtypeone(i, self.ins[n]['oldscript'])
+        global json_db
+        txcopy=self.copy()
+        txcopy.hashtypeone(i, self.ins[n]['oldscript'])
 
-		sec=''
-		for k in json_db['keys']:
-		  if k['addr']==self.ins[n]['addr'] and 'hexsec' in k:
-			sec=k['hexsec']
-		if sec=='':
-			print "priv key not found (addr:"+self.ins[n]['addr']+")"
-			return ""
+        sec=''
+        for k in json_db['keys']:
+          if k['addr']==self.ins[n]['addr'] and 'hexsec' in k:
+            sec=k['hexsec']
+        if sec=='':
+            print "priv key not found (addr:"+self.ins[n]['addr']+")"
+            return ""
 
-		self.ins[n]['sig']=sign_message(sec.decode('hex'), txcopy.get_tx(), True)
+        self.ins[n]['sig']=sign_message(sec.decode('hex'), txcopy.get_tx(), True)
 
-	def ser():
-		r={}
-		r['ins']=self.ins
-		r['outs']=self.outs
-		r['tosign']=self.tosign
-		return json.dumps(r)
+    def ser():
+        r={}
+        r['ins']=self.ins
+        r['outs']=self.outs
+        r['tosign']=self.tosign
+        return json.dumps(r)
 
-	def unser(r):
-		s=json.loads(r)
-		self.ins=s['ins']
-		self.outs=s['outs']
-		self.tosign=s['tosign']
+    def unser(r):
+        s=json.loads(r)
+        self.ins=s['ins']
+        self.outs=s['outs']
+        self.tosign=s['tosign']
 
-	def get_tx():
-		r=''
-		ret += inverse_str("%08x"%1)
-		ret += "%02x"%len(self.ins)
+    def get_tx():
+        r=''
+        ret += inverse_str("%08x"%1)
+        ret += "%02x"%len(self.ins)
 
-		for i in range(len(self.ins)):
-			txin=self.ins[i]
-			ret += inverse_str(txin['hash'])
-			ret += inverse_str("%08x"%txin['index'])
+        for i in range(len(self.ins)):
+            txin=self.ins[i]
+            ret += inverse_str(txin['hash'])
+            ret += inverse_str("%08x"%txin['index'])
 
-			if txin['pubkey']!="":
-				tmp += "%02x"%(1+len(txin['sig'])/2)
-				tmp += txin['sig']
-				tmp += "01"
-				tmp += "%02x"%(len(txin['pubkey'])/2)
-				tmp += txin['pubkey']
+            if txin['pubkey']!="":
+                tmp += "%02x"%(1+len(txin['sig'])/2)
+                tmp += txin['sig']
+                tmp += "01"
+                tmp += "%02x"%(len(txin['pubkey'])/2)
+                tmp += txin['pubkey']
 
-				ret += "%02x"%(len(tmp)/2)
-				ret += tmp
+                ret += "%02x"%(len(tmp)/2)
+                ret += tmp
 
-			elif txin['oldscript']!="":
-				ret += "%02x"%(len(txin['oldscript'])/2)
-				ret += txin['oldscript']
+            elif txin['oldscript']!="":
+                ret += "%02x"%(len(txin['oldscript'])/2)
+                ret += txin['oldscript']
 
-			else:
-				ret += "00"
+            else:
+                ret += "00"
 
-			ret += "ffffffff"
+            ret += "ffffffff"
 
-		ret += "%02x"%len(self.outs)
+        ret += "%02x"%len(self.outs)
 
-		for i in range(len(self.outs)):
-			txout=self.outs[i]
-			ret += inverse_str("%016x"%(txout['amount']))
+        for i in range(len(self.outs)):
+            txout=self.outs[i]
+            ret += inverse_str("%016x"%(txout['amount']))
 
-			if txout['script'][:2]=='s:':  #script
-				script=txout['script'][:2]
-				ret += "%02x"%(len(script)/2)
-				ret += script
-			else:                         #address
-				ret += "%02x"%(len(txout['script'])/2+5)
-				ret += "%02x"%OP_DUP
-				ret += "%02x"%OP_HASH160
-				ret += "%02x"%(len(txout['script'])/2)
-				ret += txout['script']
-				ret += "%02x"%OP_EQUALVERIFY
-				ret += "%02x"%OP_CHECKSIG
+            if txout['script'][:2]=='s:':  #script
+                script=txout['script'][:2]
+                ret += "%02x"%(len(script)/2)
+                ret += script
+            else:                         #address
+                ret += "%02x"%(len(txout['script'])/2+5)
+                ret += "%02x"%OP_DUP
+                ret += "%02x"%OP_HASH160
+                ret += "%02x"%(len(txout['script'])/2)
+                ret += txout['script']
+                ret += "%02x"%OP_EQUALVERIFY
+                ret += "%02x"%OP_CHECKSIG
 
-		ret += "00000000"
-		if not self.tosign:
-			ret += "01000000"
-		return ret
+        ret += "00000000"
+        if not self.tosign:
+            ret += "01000000"
+        return ret
 
 
 def listtx_txt(adds):
-			untx_site="http://blockchain.info/unspent?active="
-			ret=''
-			table="""<form action='CT' method=post><table border=1>"""
-			utx=untx_site+adds
-			try:
-				utxs=json.loads(urllib.urlopen(utx).read())["unspent_outputs"]
-			except:
-				return "No inputs"
+            untx_site="http://blockchain.info/unspent?active="
+            ret=''
+            table="""<form action='CT' method=post><table border=1>"""
+            utx=untx_site+adds
+            try:
+                utxs=json.loads(urllib.urlopen(utx).read())["unspent_outputs"]
+            except:
+                return "No inputs"
 
-			table+="<tr>\
-					<td>Use</td>\
-					<td>Tx hash</td>\
-					<td>Script</td>\
-					<td>Amount</td>\
-				</tr>"
-			for tx in utxs:
-				txhash=str(tx["tx_hash"]).decode('hex')[::-1].encode('hex')
-				txn=int(tx["tx_output_n"])
-				txscript=str(tx["script"])
-				txvalue=int(tx["value"])
-				table+="<tr>"
-				table+="<td>\
-							<input type=checkbox onchange='totalin+=(this.checked?1:-1)*"+str(txvalue)+";majfee();' value='' defaultChecked=false name='txin_"+txhash+"_use_"+random_string(6)+"' >\
-							<input type=hidden name='txin_"+txhash+"_h' value='"+str(txhash)+"'>\
-							<input type=hidden name='txin_"+txhash+"_n' value='"+str(txn)+"'>\
-							<input type=hidden name='txin_"+txhash+"_script' value='"+txscript+"'>\
+            table+="<tr>\
+                    <td>Use</td>\
+                    <td>Tx hash</td>\
+                    <td>Script</td>\
+                    <td>Amount</td>\
+                </tr>"
+            for tx in utxs:
+                txhash=str(tx["tx_hash"]).decode('hex')[::-1].encode('hex')
+                txn=int(tx["tx_output_n"])
+                txscript=str(tx["script"])
+                txvalue=int(tx["value"])
+                table+="<tr>"
+                table+="<td>\
+                            <input type=checkbox onchange='totalin+=(this.checked?1:-1)*"+str(txvalue)+";majfee();' value='' defaultChecked=false name='txin_"+txhash+"_use_"+random_string(6)+"' >\
+                            <input type=hidden name='txin_"+txhash+"_h' value='"+str(txhash)+"'>\
+                            <input type=hidden name='txin_"+txhash+"_n' value='"+str(txn)+"'>\
+                            <input type=hidden name='txin_"+txhash+"_script' value='"+txscript+"'>\
 <input type=hidden name='txin_"+txhash+"_amin' value='"+str(txvalue)+"'>\
-						</td>"
-#				table+="<td>"+a+"</td>"
-				table+="<td>"+txhash+"</td>"
-				table+="<!--td>"+str(txn)+"</td-->"
-				if txscript[:6]+txscript[-4:]=="76a91488ac":
-					table+="<td>Address "+hash_160_to_bc_address(txscript[6:-4].decode('hex'))+"</td>"
-					table+="<input type=hidden name='txin_"+txhash+"_add' value='"+hash_160_to_bc_address(txscript[6:-4].decode('hex'))+"'>"
-				else:
-					table+="<td>"+txscript+"</td>"
+                        </td>"
+#               table+="<td>"+a+"</td>"
+                table+="<td>"+txhash+"</td>"
+                table+="<!--td>"+str(txn)+"</td-->"
+                if txscript[:6]+txscript[-4:]=="76a91488ac":
+                    table+="<td>Address "+hash_160_to_bc_address(txscript[6:-4].decode('hex'))+"</td>"
+                    table+="<input type=hidden name='txin_"+txhash+"_add' value='"+hash_160_to_bc_address(txscript[6:-4].decode('hex'))+"'>"
+                else:
+                    table+="<td>"+txscript+"</td>"
 
-				table+="<td>"+str(txvalue/1e8)+"</td>"
-				table+="</tr>\n"
-			table+="</table>"
-			ret+=table
+                table+="<td>"+str(txvalue/1e8)+"</td>"
+                table+="</tr>\n"
+            table+="</table>"
+            ret+=table
 
-			ret+="<span id='tot_in'>0</span> BTC (inputs) - <span id='tot_out'>0</span> BTC (outputs) = <span id='tot_fee'>0</span> BTC (fee)<br /><br />"
+            ret+="<span id='tot_in'>0</span> BTC (inputs) - <span id='tot_out'>0</span> BTC (outputs) = <span id='tot_fee'>0</span> BTC (fee)<br /><br />"
 
-			txouts=""
-			nbretxouts=30
-			unserouts=["parseFloat(document.getElementById(\"txout_am_"+str(i)+"\").value)" for i in range(nbretxouts)]
-			serouts="+".join(unserouts)
-			for i in range(nbretxouts):
-				txouts+="<span id='txout_"+str(i)+"' style='display:"+X_if_else("inline",i<3,"none")+";' >\
+            txouts=""
+            nbretxouts=30
+            unserouts=["parseFloat(document.getElementById(\"txout_am_"+str(i)+"\").value)" for i in range(nbretxouts)]
+            serouts="+".join(unserouts)
+            for i in range(nbretxouts):
+                txouts+="<span id='txout_"+str(i)+"' style='display:"+X_if_else("inline",i<3,"none")+";' >\
 Amount: <input value='0' onchange='totalout=Math.round(("+serouts+")*100000000);majfee();' name='txout_am_"+str(i)+"' id='txout_am_"+str(i)+"' />&nbsp;&nbsp;&nbsp;&nbsp;Script: <input name='txout_script_"+str(i)+"' />\
 \
 \
 \
 <br />"+X_if_else("<input type=button id='button_txout_"+str(i)+"' value='Add a txout' onclick='document.getElementById(\"txout_"+str(i+X_if_else(0,i==nbretxouts-1,1))+"\").style.display=\"block\";document.getElementById(\"button_txout_"+str(i)+"\").style.display=\"none\";' />",i>=2,"")+"</span>"
 
-			ret+=txouts
-			ret+="<input type=submit value='Create' /></form>"
-#			ret+=WI_Submit('Create', '', '', 'ajaxCTX2')
+            ret+=txouts
+            ret+="<input type=submit value='Create' /></form>"
+#           ret+=WI_Submit('Create', '', '', 'ajaxCTX2')
 
-			return ret
+            return ret
 
 if 'twisted' not in missing_dep:
-	class WIInfo(resource.Resource):
-
-		 def render_GET(self, request):
-			 global addrtype
-			 try:
-					sec = request.args['key'][0]
-					format = request.args['format'][0]
-					addrtype = int(request.args['vers'][0])
-					msgIsHex = False
-					msgIsFile = False
-					try:
-						msg = request.args['msg'][0]
-						if msg[0:4] == "Hex:":
-							msg = msg[4:]
-							msgIsHex = True
-						elif msg[0:5] == "File:":
-							msg = msg[5:]
-							if not os.path.isfile(msg):
-								return '%s doesn\'t exist'%(msg)
-							filin = open(msg, 'r')
-							msg = filin.read()
-							filin.close()
-							msgIsFile = True
-
-						sig = request.args['sig'][0]
-						pubkey = request.args['pubkey'][0]
-						need = int(request.args['need'][0])
-					except:
-						need = 1
-
-					ret = ""
-
-					if sec is not '':
-						if format in 'reg':
-							pkey = regenerate_key(sec)
-							compressed = is_compressed(sec)
-						elif len(sec) == 64:
-							pkey = EC_KEY(str_to_long(sec.decode('hex')))
-							compressed = False
-						elif len(sec) == 66:
-							pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
-							compressed = True
-						else:
-							return "Hexadecimal private keys must be 64 characters long"
-
-						if not pkey:
-							return "Bad private key"
-
-
-						secret = GetSecret(pkey)
-						private_key = GetPrivKey(pkey, compressed)
-						public_key = GetPubKey(pkey, compressed)
-						addr = public_key_to_bc_address(public_key)
-
-						if need & 1:
-							ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
-							ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret, compressed))
-							ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
-							ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
-	#						ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
-							ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
-							ret += X_if_else('<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r), (int(secret.encode('hex'), 16)>_r), '')
-
-					if 'ecdsa' not in missing_dep and need & 2:
-						if sec is not '' and msg is not '':
-							if need & 1:
-								ret += "<br />"
-							ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
-
-						if sig is not '' and msg is not '' and pubkey is not '':
-							addr = public_key_to_bc_address(pubkey.decode('hex'))
-							try:
-								verify_message_signature(pubkey, sig, msg, msgIsHex)
-								ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
-							except:
-								ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
-
-					return ret
-
-			 except:
-				 log.err()
-				 return 'Error in info page'
-
-			 def render_POST(self, request):
-				 return self.render_GET(request)
-
-
-	class WIImportTx(resource.Resource):
-
-		 def render_GET(self, request):
-			 global addrtype
-			 try:
-					wdir=request.args['dir'][0]
-					wname=request.args['name'][0]
-					txk=request.args['txk'][0]
-					txv=request.args['txv'][0]
-					d = {}
-
-					if not os.path.isfile(wdir+"/"+wname):
-						return '%s/%s doesn\'t exist'%(wdir, wname)
-
-					if txk not in "file":
-						dd = [{'tx_k':txk, 'tx_v':txv}]
-					else:
-						if not os.path.isfile(txv):
-							return '%s doesn\'t exist'%(txv)
-						dd = read_jsonfile(txv)
-
-
-					db_env = create_env(wdir)
-					read_wallet(json_db, db_env, wname, True, True, "", None)
-					db = open_wallet(db_env, wname, writable=True)
-
-					i=0
-					for tx in dd:
-						d = {'txi':tx['tx_k'], 'txv':tx['tx_v']}
-						print(d)
-						update_wallet(db, "tx", d)
-						i+=1
-
-					db.close()
-
-					return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
-
-			 except:
-				 log.err()
-				 return 'Error in importtx page'
-
-			 def render_POST(self, request):
-				 return self.render_GET(request)
-
-	class WIQuit(resource.Resource):
-		def render_GET(self, request):
-			reactor.stop()
-		def render_POST(self, request):
-			return self.render_GET(request)
-
-	class WICTListTx(resource.Resource):
-		def render_GET(self, request):
-			global CTX_adds
-			try:
-				adds=request.args['addresses'][0]
-				CTX_adds=adds
-			except:
-				return "You must provide at least one address to see the transaction you can spend. Divided by |"
-
-			ret=""
-			ret=listtx_txt(adds)
-			return "Refresh to display available incoming transactions"
-
-		def render_POST(self, request):
-			return self.render_GET(request)
-
-	class WICT(resource.Resource):
-		def render_GET(self, request):
-			#CT?sec=s&hashesin=h&indexes=1&pubkeys=p&prevspk=r&amounts=2453628&spk=spk#tbend
-			global txin_amounts, json_db
-			display = ""
-
-
-
-			try:
-				testnet=request.args['testnet'][0]
-				TN="testnet"
-			except:
-				TN=""
-
-			try:
-
-				list_sec, list_hin, list_indexes, list_pubs, list_scriptin, list_outam, list_scriptout, list_amin = [[] for i in range(8)]
-
-				txin_to_use=[]
-				txouts_nos=[]
-				txouts_not_empty=[]
-				for i in request.args:
-					if i[:4]=='txin' and i[-10:-7]=='use':
-						txin_to_use.append(i.split('_')[1])
-					if i[:4]=='txou' and i.split('_')[2] not in txouts_nos:
-						p=i.split('_')[1]
-						no=i.split('_')[2]
-						txouts_nos.append(no)
-
-				for no in txouts_nos:
-				  if request.args['txout_am_'+no][0]!='' and request.args['txout_am_'+no][0]!='0':
-					list_outam.append(request.args['txout_am_'+no][0])
-					list_scriptout.append(request.args['txout_script_'+no][0])
-
-
-				global addr_to_keys
-				for h in txin_to_use:
-					if request.args['txin_'+h+'_add'][0] not in addr_to_keys.keys():
-						return "<br />No private key for "+request.args['txin_'+h+'_add'][0]+", please dump a wallet containing this address<br /><br /><a href='http://localhost:"+str(webport)+"'>Return to Pywallet</a>"
-
-					list_hin.append(h)
-					list_indexes.append(request.args['txin_'+h+'_n'][0])
-					list_scriptin.append(request.args['txin_'+h+'_script'][0])
-					list_sec.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][0])
-					list_pubs.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][1])
-					list_amin.append(request.args['txin_'+h+'_amin'][0])
-
-				sec=",".join(list_sec)
-				hashesin=",".join(list_hin)
-				indexes=",".join(list_indexes)
-				pubkeys=",".join(list_pubs)
-				prevspk=",".join(list_scriptin)
-				amins=",".join(list_amin)
-				amounts=",".join(list_outam)
-				spk=",".join(list_scriptout)
-
-
-			except:
-				display += "error"
-				return display
-
-			secret_key = sec.split(',')
-			hashes_txin = hashesin.split(',')
-			indexes_txin = indexes.split(',')
-			for i in range(len(indexes_txin)):
-				indexes_txin[i] = int(indexes_txin[i])
-			pubkey_txin = pubkeys.split(',')
-			am_txin = amins.split(',')
-			prevScriptPubKey = prevspk.split(',')
-
-			amounts_txout = amounts.split(',')
-			for i in range(len(amounts_txout)):
-				amounts_txout[i] = int(1e8*float(amounts_txout[i]))
-			spk_txout = spk.split(',')
-
-			tx = create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevScriptPubKey, amounts_txout, spk_txout)
-
-			display += "Inputs: (go to <a href='CTTest'>CTTest</a> before)<br />"
-			sum_in = 0
-			for i in range(len(hashes_txin)):
-				try:
-#					ain = txin_amounts[hashes_txin[i] + ("%d"%indexes_txin[i])]
-					ain=int(am_txin[i])/1e8
-					aaa = ", %.8f BTC"%ain
-					sum_in += ain
-				except:
-					aaa = ""
-				display += ('%d: <a href="http://blockexplorer.com/'+TN+'/tx/%s#o%d">%s #%d</a>%s<br />')%(i, hashes_txin[i], indexes_txin[i], hashes_txin[i], indexes_txin[i], aaa)
-
-			display += "<br /><br />Outputs:<br />"
-			sum_out = 0
-			for i in range(len(spk_txout)):
-				sum_out += amounts_txout[i]/BTC
-				display += '%.8f BTC to %s<br />'%(amounts_txout[i]/BTC, hash_160_to_bc_address(spk_txout[i].decode('hex')))
-
-			display += "<br />"
-			display += "<br />"
-			display += "In: %.8f BTC"%sum_in
-			display += "<br />"
-			display += "Out: %.8f BTC"%sum_out
-			display += "<br />"
-			display += "Fee: %.8f BTC"%(sum_in-sum_out)
-			display += "<br />"
-			display += "<br />"
-			display += "<br />"
-			display += ("<pre>Transaction hash: "+tx[0])
-			display += "<br />"
-#			display += ("tx_k:    "+tx[1])
-#			display += "<br />"
-			display += ("Raw transaction:       "+tx[2])
-
-			display += "</pre><br />"
-
-
-			return display
-
-		def render_POST(self, request):
-			return self.render_GET(request)
-
-	class WICTTest(resource.Resource):
-
-		def render_GET(self, request):
-			try:
-				request.args['testnet'][0]
-				testnet=True
-			except:
-				testnet=False
-			list_avtx = {}
-			i = 0
-
-			try:
-				for add in request.args['addresses'][0].split(','):
-					print "Address %d: %s"%(i, add)
-					list_avtx[add] = bc_address_to_available_tx(add, testnet)[add]
-					i += 1
-
-				print(list_avtx)
-
-				display = ""
-				display += write_avtx(list_avtx, testnet)
-			except:
-				display="You must provide at least one address to see the transaction you can spend.<br /><a href='CTTest?addresses=1BAdzvknPux2zqG2eNawvgitCW1aqwE4bb'>Like this</a>"
-
-			return display
-
-		def render_POST(self, request):
-			return self.render_GET(request)
-
-
-	class WIImport(resource.Resource):
-
-		 def render_GET(self, request):
-			 global addrtype
-			 try:
-                                pub=request.args['pub'][0]
-                                try:
-										wdir=request.args['dir'][0]
-										wname=request.args['name'][0]
-										label=request.args['label'][0]
-
-										db_env = create_env(wdir)
-										db = open_wallet(db_env, wname, writable=True)
-										update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
-										update_wallet(db, 'name', { 'hash' : public_key_to_bc_address(pub.decode('hex')), 'name' : "Read-only: "+label })
-										db.close()
-										return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" imported"
-        			except:
-										return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
-			 except:
-                                pass
-
-			 try:
-
-					wdir=request.args['dir'][0]
-					wname=request.args['name'][0]
-
-					try:		#Import a single key
-						addrtype = int(request.args['vers'][0])
-						format = X_if_else('hex', request.args['format'][0]=='true', 'reg')
-						reserve=request.args.has_key('reserve')
-						label=request.args['label'][0]
-						compressed=request.args['com'][0]=='true'
-						tocrypt=request.args['cry'][0]=='true'
-						sec = request.args['key'][0]
-					except:		#Import csv file
-						ret=import_csv_keys(request.args['file'][0],wdir,wname)
-						return "File "+X_if_else("", ret, "not ")+"imported"
-
-
-
-
-
-					if format in 'reg':
-						pkey = regenerate_key(sec)
-						compressed = is_compressed(sec)
-					elif len(sec) == 64:
-						pkey = EC_KEY(str_to_long(sec.decode('hex')))
-						compressed = False
-					elif len(sec) == 66:
-						pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
-						compressed = True
-					else:
-						return "Hexadecimal private keys must be 64 or 66 characters long"
-
-					if not pkey:
-						return "Bad private key"
-
-					if not os.path.isfile(wdir+"/"+wname):
-						return '%s/%s doesn\'t exist'%(wdir, wname)
-
-
-					db_env = create_env(wdir)
-					ret_read = read_wallet(json_db, db_env, wname, True, True, "", None)
-					tocrypt = ret_read['crypted']
-					db = open_wallet(db_env, wname, writable=True)
-
-
-					secret = GetSecret(pkey)
-					private_key = GetPrivKey(pkey, compressed)
-					public_key = GetPubKey(pkey, compressed)
-					addr = public_key_to_bc_address(public_key)
-
-
-
-					if (format in 'reg' and sec in private_keys) or (format not in 'reg' and sec in private_hex_keys):
-						return "Already exists"
-
-					if not tocrypt:
-						update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
-					else:
-						cry_master = json_db['mkey']['encrypted_key'].decode('hex')
-						cry_salt   = json_db['mkey']['salt'].decode('hex')
-						cry_rounds = json_db['mkey']['nDerivationIterations']
-						cry_method = json_db['mkey']['nDerivationMethod']
-
-						crypter.SetKeyFromPassphrase(passphrase, cry_salt, cry_rounds, cry_method)
-						masterkey = crypter.Decrypt(cry_master)
-						crypter.SetKey(masterkey)
-						crypter.SetIV(Hash(public_key))
-						e = crypter.Encrypt(secret)
-						ck_epk=e
-
-						update_wallet(db, 'ckey', { 'public_key' : public_key, 'encrypted_private_key' : ck_epk })
-
-					if not reserve:
-						update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
-
-					db.close()
-
-					return "<pre>Address: %s\nPrivkey: %s\nHexkey: %s\nKey (%scrypted, %scompressed) imported in %s/%s<pre>" % (addr, SecretToASecret(secret, compressed), secret.encode('hex'), X_if_else("",tocrypt,"un"), X_if_else("",compressed,"un"), wdir, wname)
-
-			 except:
-				 log.err()
-				 return 'Error in import page'
-
-			 def render_POST(self, request):
-				 return self.render_GET(request)
-
-	class WI404(resource.Resource):
-
-		 def render_GET(self, request):
-			 return 'Page Not Found'
+    class WIInfo(resource.Resource):
+
+         def render_GET(self, request):
+             global addrtype
+             try:
+                    sec = request.args['key'][0]
+                    format = request.args['format'][0]
+                    addrtype = int(request.args['vers'][0])
+                    msgIsHex = False
+                    msgIsFile = False
+                    try:
+                        msg = request.args['msg'][0]
+                        if msg[0:4] == "Hex:":
+                            msg = msg[4:]
+                            msgIsHex = True
+                        elif msg[0:5] == "File:":
+                            msg = msg[5:]
+                            if not os.path.isfile(msg):
+                                return '%s doesn\'t exist'%(msg)
+                            filin = open(msg, 'r')
+                            msg = filin.read()
+                            filin.close()
+                            msgIsFile = True
+
+                        sig = request.args['sig'][0]
+                        pubkey = request.args['pubkey'][0]
+                        need = int(request.args['need'][0])
+                    except:
+                        need = 1
+
+                    ret = ""
+
+                    if sec is not '':
+                        if format in 'reg':
+                            pkey = regenerate_key(sec)
+                            compressed = is_compressed(sec)
+                        elif len(sec) == 64:
+                            pkey = EC_KEY(str_to_long(sec.decode('hex')))
+                            compressed = False
+                        elif len(sec) == 66:
+                            pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
+                            compressed = True
+                        else:
+                            return "Hexadecimal private keys must be 64 characters long"
+
+                        if not pkey:
+                            return "Bad private key"
+
+
+                        secret = GetSecret(pkey)
+                        private_key = GetPrivKey(pkey, compressed)
+                        public_key = GetPubKey(pkey, compressed)
+                        addr = public_key_to_bc_address(public_key)
+
+                        if need & 1:
+                            ret += "Address (%s): %s<br />"%(aversions[addrtype], addr)
+                            ret += "Privkey (%s): %s<br />"%(aversions[addrtype], SecretToASecret(secret, compressed))
+                            ret += "Hexprivkey: %s<br />"%(secret.encode('hex'))
+                            ret += "Hash160: %s<br />"%(bc_address_to_hash_160(addr).encode('hex'))
+    #                       ret += "Inverted hexprivkey: %s<br />"%(inversetxid(secret.encode('hex')))
+                            ret += "Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(pkey.pubkey.point.x(), pkey.pubkey.point.y())
+                            ret += X_if_else('<br /><br /><b>Beware, 0x%s is equivalent to 0x%.33x</b>'%(secret.encode('hex'), int(secret.encode('hex'), 16)-_r), (int(secret.encode('hex'), 16)>_r), '')
+
+                    if 'ecdsa' not in missing_dep and need & 2:
+                        if sec is not '' and msg is not '':
+                            if need & 1:
+                                ret += "<br />"
+                            ret += "Signature of '%s' by %s: <span style='font-size:60%%;'>%s</span><br />Pubkey: <span style='font-size:60%%;'>04%.64x%.64x</span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sign_message(secret, msg, msgIsHex), pkey.pubkey.point.x(), pkey.pubkey.point.y())
+
+                        if sig is not '' and msg is not '' and pubkey is not '':
+                            addr = public_key_to_bc_address(pubkey.decode('hex'))
+                            try:
+                                verify_message_signature(pubkey, sig, msg, msgIsHex)
+                                ret += "<br /><span style='color:#005500;'>Signature of '%s' by %s is <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
+                            except:
+                                ret += "<br /><span style='color:#990000;'>Signature of '%s' by %s is NOT <span style='font-size:60%%;'>%s</span></span><br />"%(X_if_else(msg, not msgIsFile, request.args['msg'][0]), addr, sig)
+
+                    return ret
+
+             except:
+                 log.err()
+                 return 'Error in info page'
+
+             def render_POST(self, request):
+                 return self.render_GET(request)
+
+
+    class WIImportTx(resource.Resource):
+
+         def render_GET(self, request):
+             global addrtype
+             try:
+                    wdir=request.args['dir'][0]
+                    wname=request.args['name'][0]
+                    txk=request.args['txk'][0]
+                    txv=request.args['txv'][0]
+                    d = {}
+
+                    if not os.path.isfile(wdir+"/"+wname):
+                        return '%s/%s doesn\'t exist'%(wdir, wname)
+
+                    if txk not in "file":
+                        dd = [{'tx_k':txk, 'tx_v':txv}]
+                    else:
+                        if not os.path.isfile(txv):
+                            return '%s doesn\'t exist'%(txv)
+                        dd = read_jsonfile(txv)
+
+
+                    db_env = create_env(wdir)
+                    read_wallet(json_db, db_env, wname, True, True, "", None)
+                    db = open_wallet(db_env, wname, writable=True)
+
+                    i=0
+                    for tx in dd:
+                        d = {'txi':tx['tx_k'], 'txv':tx['tx_v']}
+                        print(d)
+                        update_wallet(db, "tx", d)
+                        i+=1
+
+                    db.close()
+
+                    return "<pre>hash: %s\n%d transaction%s imported in %s/%s<pre>" % (inverse_str(txk[6:]), i, iais(i), wdir, wname)
+
+             except:
+                 log.err()
+                 return 'Error in importtx page'
+
+             def render_POST(self, request):
+                 return self.render_GET(request)
+
+    class WIQuit(resource.Resource):
+        def render_GET(self, request):
+            reactor.stop()
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+    class WICTListTx(resource.Resource):
+        def render_GET(self, request):
+            global CTX_adds
+            try:
+                adds=request.args['addresses'][0]
+                CTX_adds=adds
+            except:
+                return "You must provide at least one address to see the transaction you can spend. Divided by |"
+
+            ret=""
+            ret=listtx_txt(adds)
+            return "Refresh to display available incoming transactions"
+
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+    class WICT(resource.Resource):
+        def render_GET(self, request):
+            #CT?sec=s&hashesin=h&indexes=1&pubkeys=p&prevspk=r&amounts=2453628&spk=spk#tbend
+            global txin_amounts, json_db
+            display = ""
+
+
+
+            try:
+                testnet=request.args['testnet'][0]
+                TN="testnet"
+            except:
+                TN=""
+
+            try:
+
+                list_sec, list_hin, list_indexes, list_pubs, list_scriptin, list_outam, list_scriptout, list_amin = [[] for i in range(8)]
+
+                txin_to_use=[]
+                txouts_nos=[]
+                txouts_not_empty=[]
+                for i in request.args:
+                    if i[:4]=='txin' and i[-10:-7]=='use':
+                        txin_to_use.append(i.split('_')[1])
+                    if i[:4]=='txou' and i.split('_')[2] not in txouts_nos:
+                        p=i.split('_')[1]
+                        no=i.split('_')[2]
+                        txouts_nos.append(no)
+
+                for no in txouts_nos:
+                  if request.args['txout_am_'+no][0]!='' and request.args['txout_am_'+no][0]!='0':
+                    list_outam.append(request.args['txout_am_'+no][0])
+                    list_scriptout.append(request.args['txout_script_'+no][0])
+
+
+                global addr_to_keys
+                for h in txin_to_use:
+                    if request.args['txin_'+h+'_add'][0] not in addr_to_keys.keys():
+                        return "<br />No private key for "+request.args['txin_'+h+'_add'][0]+", please dump a wallet containing this address<br /><br /><a href='http://localhost:"+str(webport)+"'>Return to Pywallet</a>"
+
+                    list_hin.append(h)
+                    list_indexes.append(request.args['txin_'+h+'_n'][0])
+                    list_scriptin.append(request.args['txin_'+h+'_script'][0])
+                    list_sec.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][0])
+                    list_pubs.append(addr_to_keys[request.args['txin_'+h+'_add'][0]][1])
+                    list_amin.append(request.args['txin_'+h+'_amin'][0])
+
+                sec=",".join(list_sec)
+                hashesin=",".join(list_hin)
+                indexes=",".join(list_indexes)
+                pubkeys=",".join(list_pubs)
+                prevspk=",".join(list_scriptin)
+                amins=",".join(list_amin)
+                amounts=",".join(list_outam)
+                spk=",".join(list_scriptout)
+
+
+            except:
+                display += "error"
+                return display
+
+            secret_key = sec.split(',')
+            hashes_txin = hashesin.split(',')
+            indexes_txin = indexes.split(',')
+            for i in range(len(indexes_txin)):
+                indexes_txin[i] = int(indexes_txin[i])
+            pubkey_txin = pubkeys.split(',')
+            am_txin = amins.split(',')
+            prevScriptPubKey = prevspk.split(',')
+
+            amounts_txout = amounts.split(',')
+            for i in range(len(amounts_txout)):
+                amounts_txout[i] = int(1e8*float(amounts_txout[i]))
+            spk_txout = spk.split(',')
+
+            tx = create_transaction(secret_key, hashes_txin, indexes_txin, pubkey_txin, prevScriptPubKey, amounts_txout, spk_txout)
+
+            display += "Inputs: (go to <a href='CTTest'>CTTest</a> before)<br />"
+            sum_in = 0
+            for i in range(len(hashes_txin)):
+                try:
+#                   ain = txin_amounts[hashes_txin[i] + ("%d"%indexes_txin[i])]
+                    ain=int(am_txin[i])/1e8
+                    aaa = ", %.8f BTC"%ain
+                    sum_in += ain
+                except:
+                    aaa = ""
+                display += ('%d: <a href="http://blockexplorer.com/'+TN+'/tx/%s#o%d">%s #%d</a>%s<br />')%(i, hashes_txin[i], indexes_txin[i], hashes_txin[i], indexes_txin[i], aaa)
+
+            display += "<br /><br />Outputs:<br />"
+            sum_out = 0
+            for i in range(len(spk_txout)):
+                sum_out += amounts_txout[i]/BTC
+                display += '%.8f BTC to %s<br />'%(amounts_txout[i]/BTC, hash_160_to_bc_address(spk_txout[i].decode('hex')))
+
+            display += "<br />"
+            display += "<br />"
+            display += "In: %.8f BTC"%sum_in
+            display += "<br />"
+            display += "Out: %.8f BTC"%sum_out
+            display += "<br />"
+            display += "Fee: %.8f BTC"%(sum_in-sum_out)
+            display += "<br />"
+            display += "<br />"
+            display += "<br />"
+            display += ("<pre>Transaction hash: "+tx[0])
+            display += "<br />"
+#           display += ("tx_k:    "+tx[1])
+#           display += "<br />"
+            display += ("Raw transaction:       "+tx[2])
+
+            display += "</pre><br />"
+
+
+            return display
+
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+    class WICTTest(resource.Resource):
+
+        def render_GET(self, request):
+            try:
+                request.args['testnet'][0]
+                testnet=True
+            except:
+                testnet=False
+            list_avtx = {}
+            i = 0
+
+            try:
+                for add in request.args['addresses'][0].split(','):
+                    print "Address %d: %s"%(i, add)
+                    list_avtx[add] = bc_address_to_available_tx(add, testnet)[add]
+                    i += 1
+
+                print(list_avtx)
+
+                display = ""
+                display += write_avtx(list_avtx, testnet)
+            except:
+                display="You must provide at least one address to see the transaction you can spend.<br /><a href='CTTest?addresses=1BAdzvknPux2zqG2eNawvgitCW1aqwE4bb'>Like this</a>"
+
+            return display
+
+        def render_POST(self, request):
+            return self.render_GET(request)
+
+
+    class WIImport(resource.Resource):
+
+         def render_GET(self, request):
+             global addrtype
+             try:
+                pub=request.args['pub'][0]
+                try:
+                    wdir=request.args['dir'][0]
+                    wname=request.args['name'][0]
+                    label=request.args['label'][0]
+
+                    db_env = create_env(wdir)
+                    db = open_wallet(db_env, wname, writable=True)
+                    update_wallet(db, 'ckey', { 'public_key' : pub.decode('hex'), 'encrypted_private_key' : random_string(96).decode('hex') })
+                    update_wallet(db, 'name', { 'hash' : public_key_to_bc_address(pub.decode('hex')), 'name' : "Read-only: "+label })
+                    db.close()
+                    return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" imported"
+                except:
+                	return "Read-only address "+public_key_to_bc_address(pub.decode('hex'))+" not imported"
+             except:
+                pass
+
+             try:
+
+                wdir=request.args['dir'][0]
+                wname=request.args['name'][0]
+
+                try:        #Import a single key
+                    addrtype = int(request.args['vers'][0])
+                    format = X_if_else('hex', request.args['format'][0]=='true', 'reg')
+                    reserve=request.args.has_key('reserve')
+                    label=request.args['label'][0]
+                    compressed=request.args['com'][0]=='true'
+                    tocrypt=request.args['cry'][0]=='true'
+                    sec = request.args['key'][0]
+                except:     #Import csv file
+                    ret=import_csv_keys(request.args['file'][0],wdir,wname)
+                    return "File "+X_if_else("", ret, "not ")+"imported"
+
+
+                if format in 'reg':
+                    pkey = regenerate_key(sec)
+                    compressed = is_compressed(sec)
+                elif len(sec) == 64:
+                    pkey = EC_KEY(str_to_long(sec.decode('hex')))
+                    compressed = False
+                elif len(sec) == 66:
+                    pkey = EC_KEY(str_to_long(sec[:-2].decode('hex')))
+                    compressed = True
+                else:
+                    return "Hexadecimal private keys must be 64 or 66 characters long"
+
+                if not pkey:
+                    return "Bad private key"
+
+                if not os.path.isfile(wdir+"/"+wname):
+                    return '%s/%s doesn\'t exist'%(wdir, wname)
+
+
+                db_env = create_env(wdir)
+                ret_read = read_wallet(json_db, db_env, wname, True, True, "", None)
+                tocrypt = ret_read['crypted']
+                db = open_wallet(db_env, wname, writable=True)
+
+
+                secret = GetSecret(pkey)
+                private_key = GetPrivKey(pkey, compressed)
+                public_key = GetPubKey(pkey, compressed)
+                addr = public_key_to_bc_address(public_key)
+
+
+
+                if (format in 'reg' and sec in private_keys) or (format not in 'reg' and sec in private_hex_keys):
+                    return "Already exists"
+
+                if not tocrypt:
+                    update_wallet(db, 'key', { 'public_key' : public_key, 'private_key' : private_key })
+                else:
+                    cry_master = json_db['mkey']['encrypted_key'].decode('hex')
+                    cry_salt   = json_db['mkey']['salt'].decode('hex')
+                    cry_rounds = json_db['mkey']['nDerivationIterations']
+                    cry_method = json_db['mkey']['nDerivationMethod']
+
+                    crypter.SetKeyFromPassphrase(passphrase, cry_salt, cry_rounds, cry_method)
+                    masterkey = crypter.Decrypt(cry_master)
+                    crypter.SetKey(masterkey)
+                    crypter.SetIV(Hash(public_key))
+                    e = crypter.Encrypt(secret)
+                    ck_epk=e
+
+                    update_wallet(db, 'ckey', { 'public_key' : public_key, 'encrypted_private_key' : ck_epk })
+
+                if not reserve:
+                    update_wallet(db, 'name', { 'hash' : addr, 'name' : label })
+
+                db.close()
+
+                return "<pre>Address: %s\nPrivkey: %s\nHexkey: %s\nKey (%scrypted, %scompressed) imported in %s/%s<pre>" % (addr, SecretToASecret(secret, compressed), secret.encode('hex'), X_if_else("",tocrypt,"un"), X_if_else("",compressed,"un"), wdir, wname)
+
+             except:
+                 log.err()
+                 return 'Error in import page'
+
+             def render_POST(self, request):
+                 return self.render_GET(request)
+
+    class WI404(resource.Resource):
+
+         def render_GET(self, request):
+             return 'Page Not Found'
 
 
 def update_pyw():
-	if md5_last_pywallet[0] and md5_last_pywallet[1] not in md5_pywallet:
-		dl=urllib.urlopen('https://raw.github.com/jackjack-jj/pywallet/master/pywallet.py').read()
-		if len(dl)>40 and md5_2(dl)==md5_last_pywallet[1]:
-			filout = open(pyw_path+"/"+pyw_filename, 'w')
-			filout.write(dl)
-			filout.close()
-			thread.start_new_thread(restart_pywallet, ())
-			return "Updated, restarting..."
-		else:
-			return "Problem when downloading new version ("+md5_2(dl)+"/"+md5_last_pywallet[1]+")"
+    if md5_last_pywallet[0] and md5_last_pywallet[1] not in md5_pywallet:
+        dl=urllib.urlopen('https://raw.github.com/jackjack-jj/pywallet/master/pywallet.py').read()
+        if len(dl)>40 and md5_2(dl)==md5_last_pywallet[1]:
+            filout = open(pyw_path+"/"+pyw_filename, 'w')
+            filout.write(dl)
+            filout.close()
+            thread.start_new_thread(restart_pywallet, ())
+            return "Updated, restarting..."
+        else:
+            return "Problem when downloading new version ("+md5_2(dl)+"/"+md5_last_pywallet[1]+")"
 
 def restart_pywallet():
-	thread.start_new_thread(start_pywallet, ())
-	time.sleep(2)
-	reactor.stop()
+    thread.start_new_thread(start_pywallet, ())
+    time.sleep(2)
+    reactor.stop()
 
 def start_pywallet():
-	a=Popen("python "+pyw_path+"/"+pyw_filename+" --web --port "+str(webport)+" --wait 3", shell=True, bufsize=-1, stdout=PIPE).stdout
-	a.close()
+    a=Popen("python "+pyw_path+"/"+pyw_filename+" --web --port "+str(webport)+" --wait 3", shell=True, bufsize=-1, stdout=PIPE).stdout
+    a.close()
 
 def clone_wallet(parentPath, clonePath):
-	types,datas=[],[]
-	parentdir,parentname=os.path.split(parentPath)
-	wdir,wname=os.path.split(clonePath)
+    types,datas=[],[]
+    parentdir,parentname=os.path.split(parentPath)
+    wdir,wname=os.path.split(clonePath)
 
-	db_env = create_env(parentdir)
-	read_wallet(json_db, db_env, parentname, True, True, "", False)
+    db_env = create_env(parentdir)
+    read_wallet(json_db, db_env, parentname, True, True, "", False)
 
-	types.append('version')
-	datas.append({'version':json_db['version']})
-	types.append('defaultkey')
-	datas.append({'key':json_db['defaultkey']})
-	for k in json_db['keys']:
-		types.append('ckey')
-		datas.append({'public_key':k['pubkey'].decode('hex'),'encrypted_private_key':random_string(96).decode('hex')})
-	for k in json_db['pool']:
-		types.append('pool')
-		datas.append({'n':k['n'],'nVersion':k['nVersion'],'nTime':k['nTime'],'public_key':k['public_key_hex'].decode('hex')})
-	for addr,label in json_db['names'].items():
-		types.append('name')
-		datas.append({'hash':addr,'name':'Watch:'+label})
+    types.append('version')
+    datas.append({'version':json_db['version']})
+    types.append('defaultkey')
+    datas.append({'key':json_db['defaultkey']})
+    for k in json_db['keys']:
+        types.append('ckey')
+        datas.append({'public_key':k['pubkey'].decode('hex'),'encrypted_private_key':random_string(96).decode('hex')})
+    for k in json_db['pool']:
+        types.append('pool')
+        datas.append({'n':k['n'],'nVersion':k['nVersion'],'nTime':k['nTime'],'public_key':k['public_key_hex'].decode('hex')})
+    for addr,label in json_db['names'].items():
+        types.append('name')
+        datas.append({'hash':addr,'name':'Watch:'+label})
 
-	db_env = create_env(wdir)
-	create_new_wallet(db_env, wname, 60000)
+    db_env = create_env(wdir)
+    create_new_wallet(db_env, wname, 60000)
 
-	db = open_wallet(db_env, wname, True)
-	NPP_salt=random_string(16).decode('hex')
-	NPP_rounds=int(50000+random.random()*20000)
-	NPP_method=0
-	NPP_MK=random_string(64).decode('hex')
-	crypter.SetKeyFromPassphrase(random_string(64), NPP_salt, NPP_rounds, NPP_method)
-	NPP_EMK = crypter.Encrypt(NPP_MK)
-	update_wallet(db, 'mkey', {
-		"encrypted_key": NPP_EMK,
-		'nDerivationIterations' : NPP_rounds,
-		'nDerivationMethod' : NPP_method,
-		'nID' : 1,
-		'otherParams' : ''.decode('hex'),
-		"salt": NPP_salt
-	})
-	db.close()
+    db = open_wallet(db_env, wname, True)
+    NPP_salt=random_string(16).decode('hex')
+    NPP_rounds=int(50000+random.random()*20000)
+    NPP_method=0
+    NPP_MK=random_string(64).decode('hex')
+    crypter.SetKeyFromPassphrase(random_string(64), NPP_salt, NPP_rounds, NPP_method)
+    NPP_EMK = crypter.Encrypt(NPP_MK)
+    update_wallet(db, 'mkey', {
+        "encrypted_key": NPP_EMK,
+        'nDerivationIterations' : NPP_rounds,
+        'nDerivationMethod' : NPP_method,
+        'nID' : 1,
+        'otherParams' : ''.decode('hex'),
+        "salt": NPP_salt
+    })
+    db.close()
 
-	read_wallet(json_db, db_env, wname, True, True, "", False)
+    read_wallet(json_db, db_env, wname, True, True, "", False)
 
-	db = open_wallet(db_env, wname, writable=True)
-	update_wallet(db, types, datas, True)
-	db.close()
-	print "Wallet successfully cloned to:\n   %s"%clonePath
+    db = open_wallet(db_env, wname, writable=True)
+    update_wallet(db, types, datas, True)
+    db.close()
+    print "Wallet successfully cloned to:\n   %s"%clonePath
 
 import thread
 md5_last_pywallet = [False, ""]
 
 def retrieve_last_pywallet_md5():
-	global md5_last_pywallet
-	md5_last_pywallet = [True, md5_onlinefile('https://raw.github.com/jackjack-jj/pywallet/master/pywallet.py')]
+    global md5_last_pywallet
+    md5_last_pywallet = [True, md5_onlinefile('https://raw.github.com/jackjack-jj/pywallet/master/pywallet.py')]
 
 from optparse import OptionParser
 
 if __name__ == '__main__':
 
 
-	parser = OptionParser(usage="%prog [options]", version="%prog 1.1")
+    parser = OptionParser(usage="%prog [options]", version="%prog 1.1")
 
-	parser.add_option("--passphrase", dest="passphrase",
-		help="passphrase for the encrypted wallet")
+    parser.add_option("--passphrase", dest="passphrase",
+        help="passphrase for the encrypted wallet")
 
-	parser.add_option("--dumpwallet", dest="dump", action="store_true",
-		help="dump wallet in json format")
+    parser.add_option("--dumpwallet", dest="dump", action="store_true",
+        help="dump wallet in json format")
 
-	parser.add_option("--dumpwithbalance", dest="dumpbalance", action="store_true",
-		help="includes balance of each address in the json dump, takes about 2 minutes per 100 addresses")
+    parser.add_option("--dumpwithbalance", dest="dumpbalance", action="store_true",
+        help="includes balance of each address in the json dump, takes about 2 minutes per 100 addresses")
 
-	parser.add_option("--importprivkey", dest="key",
-		help="import private key from vanitygen")
+    parser.add_option("--importprivkey", dest="key",
+        help="import private key from vanitygen")
 
-	parser.add_option("--importhex", dest="keyishex", action="store_true",
-		help="KEY is in hexadecimal format")
+    parser.add_option("--importhex", dest="keyishex", action="store_true",
+        help="KEY is in hexadecimal format")
 
-	parser.add_option("--datadir", dest="datadir",
-		help="wallet directory (defaults to bitcoin default)")
+    parser.add_option("--datadir", dest="datadir",
+        help="wallet directory (defaults to bitcoin default)")
 
-	parser.add_option("--wallet", dest="walletfile",
-		help="wallet filename (defaults to wallet.dat)",
-		default="wallet.dat")
+    parser.add_option("--wallet", dest="walletfile",
+        help="wallet filename (defaults to wallet.dat)",
+        default="wallet.dat")
 
-	parser.add_option("--label", dest="label",
-		help="label shown in the adress book (defaults to '')",
-		default="")
+    parser.add_option("--label", dest="label",
+        help="label shown in the adress book (defaults to '')",
+        default="")
 
-	parser.add_option("--testnet", dest="testnet", action="store_true",
-		help="use testnet subdirectory and address type")
+    parser.add_option("--testnet", dest="testnet", action="store_true",
+        help="use testnet subdirectory and address type")
 
-	parser.add_option("--namecoin", dest="namecoin", action="store_true",
-		help="use namecoin address type")
+    parser.add_option("--namecoin", dest="namecoin", action="store_true",
+        help="use namecoin address type")
 
-	parser.add_option("--otherversion", dest="otherversion",
-		help="use other network address type, whose version is OTHERVERSION")
+    parser.add_option("--sendcoin", dest="sendcoin", action="store_true",
+        help="use sendcoin address type")
 
-	parser.add_option("--info", dest="keyinfo", action="store_true",
-		help="display pubkey, privkey (both depending on the network) and hexkey")
+    parser.add_option("--ohmcoin", dest="ohmcoin", action="store_true",
+        help="use ohmcoin address type")
 
-	parser.add_option("--reserve", dest="reserve", action="store_true",
-		help="import as a reserve key, i.e. it won't show in the adress book")
+    parser.add_option("--vitaecoin", dest="vitaecoin", action="store_true",
+        help="use vitaecoin address type")
 
-	parser.add_option("--multidelete", dest="multidelete",
-		help="deletes data in your wallet, according to the file provided")
+    parser.add_option("--otherversion", dest="otherversion",
+        help="use other network address type, whose version is OTHERVERSION")
 
-	parser.add_option("--balance", dest="key_balance",
-		help="prints balance of KEY_BALANCE")
+    parser.add_option("--info", dest="keyinfo", action="store_true",
+        help="display pubkey, privkey (both depending on the network) and hexkey")
 
-	parser.add_option("--web", dest="web", action="store_true",
-		help="run pywallet web interface")
+    parser.add_option("--reserve", dest="reserve", action="store_true",
+        help="import as a reserve key, i.e. it won't show in the adress book")
 
-	parser.add_option("--port", dest="port",
-		help="port of web interface (defaults to 8989)")
+    parser.add_option("--multidelete", dest="multidelete",
+        help="deletes data in your wallet, according to the file provided")
 
-	parser.add_option("--recover", dest="recover", action="store_true",
-		help="recover your deleted keys, use with recov_size and recov_device")
+    parser.add_option("--balance", dest="key_balance",
+        help="prints balance of KEY_BALANCE")
 
-	parser.add_option("--recov_device", dest="recov_device",
-		help="device to read (e.g. /dev/sda1 or E: or a file)")
+    parser.add_option("--web", dest="web", action="store_true",
+        help="run pywallet web interface")
 
-	parser.add_option("--recov_size", dest="recov_size",
-		help="number of bytes to read (e.g. 20Mo or 50Gio)")
+    parser.add_option("--port", dest="port",
+        help="port of web interface (defaults to 8989)")
 
-	parser.add_option("--recov_outputdir", dest="recov_outputdir",
-		help="output directory where the recovered wallet will be put")
+    parser.add_option("--recover", dest="recover", action="store_true",
+        help="recover your deleted keys, use with recov_size and recov_device")
 
-	parser.add_option("--clone_watchonly_from", dest="clone_watchonly_from",
-		help="path of the original wallet")
+    parser.add_option("--recov_device", dest="recov_device",
+        help="device to read (e.g. /dev/sda1 or E: or a file)")
 
-	parser.add_option("--clone_watchonly_to", dest="clone_watchonly_to",
-		help="path of the resulting watch-only wallet")
+    parser.add_option("--recov_size", dest="recov_size",
+        help="number of bytes to read (e.g. 20Mo or 50Gio)")
 
-	parser.add_option("--dont_check_walletversion", dest="dcv", action="store_true",
-		help="don't check if wallet version > %d before running (WARNING: this may break your wallet, be sure you know what you do)"%max_version)
+    parser.add_option("--recov_outputdir", dest="recov_outputdir",
+        help="output directory where the recovered wallet will be put")
 
-	parser.add_option("--wait", dest="nseconds",
-		help="wait NSECONDS seconds before launch")
+    parser.add_option("--clone_watchonly_from", dest="clone_watchonly_from",
+        help="path of the original wallet")
 
+    parser.add_option("--clone_watchonly_to", dest="clone_watchonly_to",
+        help="path of the resulting watch-only wallet")
 
-#	parser.add_option("--forcerun", dest="forcerun",
-#		action="store_true",
-#		help="run even if pywallet detects bitcoin is running")
+    parser.add_option("--dont_check_walletversion", dest="dcv", action="store_true",
+        help="don't check if wallet version > %d before running (WARNING: this may break your wallet, be sure you know what you do)"%max_version)
 
-	(options, args) = parser.parse_args()
+    parser.add_option("--wait", dest="nseconds",
+        help="wait NSECONDS seconds before launch")
 
-#	a=Popen("ps xa | grep ' bitcoin'", shell=True, bufsize=-1, stdout=PIPE).stdout
-#	aread=a.read()
-#	nl = aread.count("\n")
-#	a.close()
-#	if nl > 2:
-#		print('Bitcoin seems to be running: \n"%s"'%(aread))
-#		if options.forcerun is None:
-#			exit(0)
 
-	if options.nseconds:
-		time.sleep(int(options.nseconds))
+#   parser.add_option("--forcerun", dest="forcerun",
+#       action="store_true",
+#       help="run even if pywallet detects bitcoin is running")
 
-	if options.passphrase:
-		passphrase = options.passphrase
+    (options, args) = parser.parse_args()
 
-	if options.clone_watchonly_from is not None and options.clone_watchonly_to:
-		clone_wallet(options.clone_watchonly_from, options.clone_watchonly_to)
-		exit(0)
-
-
-	if options.recover:
-		if options.recov_size is None or options.recov_device is None or options.recov_outputdir is None:
-			print("You must provide the device, the number of bytes to read and the output directory")
-			exit(0)
-		device = options.recov_device
-		if len(device) in [2,3] and device[1]==':':
-			device="\\\\.\\"+device
-		size = read_device_size(options.recov_size)
-
-		passphraseRecov=''
-		while passphraseRecov=='':
-			passphraseRecov=raw_input("Enter the passphrase for the wallet that will contain all the recovered keys: ")
-		passphrase=passphraseRecov
-
-		passes=[]
-		p=' '
-		print '\nEnter the possible passphrases used in your deleted wallets.'
-		print "Don't forget that more passphrases = more time to test the possibilities."
-		print 'Write one passphrase per line and end with an empty line.'
-		while p!='':
-			p=raw_input("Possible passphrase: ")
-			if p!='':
-				passes.append(p)
-
-		print "\nStarting recovery."
-		recoveredKeys=recov(device, passes, size, 10240, options.recov_outputdir)
-		recoveredKeys=list(set(recoveredKeys))
-#		print recoveredKeys[0:5]
-
-
-		db_env = create_env(options.recov_outputdir)
-		recov_wallet_name = "recovered_wallet_%s.dat"%ts()
-
-		create_new_wallet(db_env, recov_wallet_name, 32500)
-
-		if passphraseRecov!="I don't want to put a password on the recovered wallet and I know what can be the consequences.":
-			db = open_wallet(db_env, recov_wallet_name, True)
-
-			NPP_salt=os.urandom(8)
-			NPP_rounds=int(50000+random.random()*20000)
-			NPP_method=0
-			NPP_MK=os.urandom(32)
-			crypter.SetKeyFromPassphrase(passphraseRecov, NPP_salt, NPP_rounds, NPP_method)
-			NPP_EMK = crypter.Encrypt(NPP_MK)
-			update_wallet(db, 'mkey', {
-				"encrypted_key": NPP_EMK,
-				'nDerivationIterations' : NPP_rounds,
-				'nDerivationMethod' : NPP_method,
-				'nID' : 1,
-				'otherParams' : ''.decode('hex'),
-				"salt": NPP_salt
-			})
-			db.close()
-
-		read_wallet(json_db, db_env, recov_wallet_name, True, True, "", False)
-
-		db = open_wallet(db_env, recov_wallet_name, True)
-
-		print "\n\nImporting:"
-		for i,sec in enumerate(recoveredKeys):
-			sec=sec.encode('hex')
-			print("\nImporting key %4d/%d:"%(i+1, len(recoveredKeys)))
-			importprivkey(db, sec, "recovered: %s"%sec, None, True)
-			importprivkey(db, sec+'01', "recovered: %s"%sec, None, True)
-		db.close()
-
-		print("\n\nThe new wallet %s/%s contains the %d recovered key%s"%(options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
-
-		exit(0)
-
-
-	if 'bsddb' in missing_dep:
-		print("pywallet needs 'bsddb' package to run, please install it")
-		exit(0)
-
-	if 'twisted' in missing_dep and options.web is not None:
-		print("'twisted' package is not installed, pywallet web interface can't be launched")
-		exit(0)
-
-	if 'ecdsa' in missing_dep:
-		print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
-
-	if 'twisted' not in missing_dep:
-		VIEWS = {
-			 'DumpWallet': WIDumpWallet(),
-			 'MergeWallets': WIMergeWallets(),
-			 'Import': WIImport(),
-			 'ImportTx': WIImportTx(),
-			 'DumpTx': WIDumpTx(),
-			 'Info': WIInfo(),
-			 'Delete': WIDelete(),
-			 'Balance': WIBalance(),
-			 'ChangePP': WIChangePP(),
-			 'Others': WIOthers(),
-			 'LoadBalances': WICTTest(),
-			 'CTTest': WICTTest(),
-			 'ListTransactions': WICTListTx(),
-			 'CreateTransaction': WICT(),
-			 'CT': WICT(),
-			 'quit': WIQuit()
-
-		}
-
-	if options.dcv is not None:
-		max_version = 10 ** 9
-
-	if options.datadir is not None:
-		wallet_dir = options.datadir
-
-	if options.walletfile is not None:
-		wallet_name = options.walletfile
-
-	if 'twisted' not in missing_dep and options.web is not None:
-		md5_pywallet = md5_file(pyw_path+"/"+pyw_filename)
-		thread.start_new_thread(retrieve_last_pywallet_md5, ())
-
-		webport = 8989
-		if options.port is not None:
-			webport = int(options.port)
-		root = WIRoot()
-		for viewName, className in VIEWS.items():
-			root.putChild(viewName, className)
-		log.startLogging(sys.stdout)
-		log.msg('Starting server: %s' %str(datetime.now()))
-		server = server.Site(root)
-		reactor.listenTCP(webport, server)
-		reactor.run()
-		exit(0)
-
-	if options.key_balance is not None:
-		print(balance(balance_site, options.key_balance))
-		exit(0)
-
-	if options.dump is None and options.key is None and options.multidelete is None:
-		print "A mandatory option is missing\n"
-		parser.print_help()
-		exit(0)
-
-	if options.namecoin or options.otherversion is not None:
-		if options.datadir is None and options.keyinfo is None:
-			print("You must provide your wallet directory")
-			exit(0)
-		else:
-			if options.namecoin:
-				addrtype = 52
-			else:
-				addrtype = int(options.otherversion)
-
-	if options.keyinfo is not None:
-		if not keyinfo(options.key, options.keyishex):
-			print "Bad private key"
-		exit(0)
-
-	db_dir = determine_db_dir()
-
-	if options.testnet:
-		db_dir += "/testnet3"
-		addrtype = 111
-
-	db_env = create_env(db_dir)
-
-	if options.multidelete is not None:
-		filename=options.multidelete
-		filin = open(filename, 'r')
-		content = filin.read().split('\n')
-		filin.close()
-		typedel=content[0]
-		kd=filter(bool,content[1:])
-		try:
-			r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
-			print '%d element%s deleted'%(r, 's'*(int(r>1)))
-		except:
-			print "Error: do not try to delete a non-existing transaction."
-			exit(1)
-		exit(0)
-
-
-	read_wallet(json_db, db_env, determine_db_name(), True, True, "", options.dumpbalance is not None)
-
-	if json_db.get('minversion') > max_version:
-		print "Version mismatch (must be <= %d)" % max_version
-		#exit(1)
-
-	if options.dump:
-		print json.dumps(json_db, sort_keys=True, indent=4)
-	elif options.key:
-		if json_db['version'] > max_version:
-			print "Version mismatch (must be <= %d)" % max_version
-		elif (options.keyishex is None and options.key in private_keys) or (options.keyishex is not None and options.key in private_hex_keys):
-			print "Already exists"
-		else:
-			db = open_wallet(db_env, determine_db_name(), writable=True)
-
-			if importprivkey(db, options.key, options.label, options.reserve, options.keyishex):
-				print "Imported successfully"
-			else:
-				print "Bad private key"
-
-			db.close()
-
-
-
-
-
+#   a=Popen("ps xa | grep ' bitcoin'", shell=True, bufsize=-1, stdout=PIPE).stdout
+#   aread=a.read()
+#   nl = aread.count("\n")
+#   a.close()
+#   if nl > 2:
+#       print('Bitcoin seems to be running: \n"%s"'%(aread))
+#       if options.forcerun is None:
+#           exit(0)
+
+    if options.nseconds:
+        time.sleep(int(options.nseconds))
+
+    if options.passphrase:
+        passphrase = options.passphrase
+
+    if options.clone_watchonly_from is not None and options.clone_watchonly_to:
+        clone_wallet(options.clone_watchonly_from, options.clone_watchonly_to)
+        exit(0)
+
+
+    if options.recover:
+        if options.recov_size is None or options.recov_device is None or options.recov_outputdir is None:
+            print("You must provide the device, the number of bytes to read and the output directory")
+            exit(0)
+        device = options.recov_device
+        if len(device) in [2,3] and device[1]==':':
+            device="\\\\.\\"+device
+        size = read_device_size(options.recov_size)
+
+        passphraseRecov=''
+        while passphraseRecov=='':
+            passphraseRecov=raw_input("Enter the passphrase for the wallet that will contain all the recovered keys: ")
+        passphrase=passphraseRecov
+
+        passes=[]
+        p=' '
+        print '\nEnter the possible passphrases used in your deleted wallets.'
+        print "Don't forget that more passphrases = more time to test the possibilities."
+        print 'Write one passphrase per line and end with an empty line.'
+        while p!='':
+            p=raw_input("Possible passphrase: ")
+            if p!='':
+                passes.append(p)
+
+        print "\nStarting recovery."
+        recoveredKeys=recov(device, passes, size, 10240, options.recov_outputdir)
+        recoveredKeys=list(set(recoveredKeys))
+#       print recoveredKeys[0:5]
+
+
+        db_env = create_env(options.recov_outputdir)
+        recov_wallet_name = "recovered_wallet_%s.dat"%ts()
+
+        create_new_wallet(db_env, recov_wallet_name, 32500)
+
+        if passphraseRecov!="I don't want to put a password on the recovered wallet and I know what can be the consequences.":
+            db = open_wallet(db_env, recov_wallet_name, True)
+
+            NPP_salt=os.urandom(8)
+            NPP_rounds=int(50000+random.random()*20000)
+            NPP_method=0
+            NPP_MK=os.urandom(32)
+            crypter.SetKeyFromPassphrase(passphraseRecov, NPP_salt, NPP_rounds, NPP_method)
+            NPP_EMK = crypter.Encrypt(NPP_MK)
+            update_wallet(db, 'mkey', {
+                "encrypted_key": NPP_EMK,
+                'nDerivationIterations' : NPP_rounds,
+                'nDerivationMethod' : NPP_method,
+                'nID' : 1,
+                'otherParams' : ''.decode('hex'),
+                "salt": NPP_salt
+            })
+            db.close()
+
+        read_wallet(json_db, db_env, recov_wallet_name, True, True, "", False)
+
+        db = open_wallet(db_env, recov_wallet_name, True)
+
+        print "\n\nImporting:"
+        for i,sec in enumerate(recoveredKeys):
+            sec=sec.encode('hex')
+            print("\nImporting key %4d/%d:"%(i+1, len(recoveredKeys)))
+            importprivkey(db, sec, "recovered: %s"%sec, None, True)
+            importprivkey(db, sec+'01', "recovered: %s"%sec, None, True)
+        db.close()
+
+        print("\n\nThe new wallet %s/%s contains the %d recovered key%s"%(options.recov_outputdir, recov_wallet_name, len(recoveredKeys), iais(len(recoveredKeys))))
+
+        exit(0)
+
+
+    if 'bsddb' in missing_dep:
+        print("pywallet needs 'bsddb' package to run, please install it")
+        exit(0)
+
+    if 'twisted' in missing_dep and options.web is not None:
+        print("'twisted' package is not installed, pywallet web interface can't be launched")
+        exit(0)
+
+    if 'ecdsa' in missing_dep:
+        print("'ecdsa' package is not installed, pywallet won't be able to sign/verify messages")
+
+    if 'twisted' not in missing_dep:
+        VIEWS = {
+             'DumpWallet': WIDumpWallet(),
+             'MergeWallets': WIMergeWallets(),
+             'Import': WIImport(),
+             'ImportTx': WIImportTx(),
+             'DumpTx': WIDumpTx(),
+             'Info': WIInfo(),
+             'Delete': WIDelete(),
+             'Balance': WIBalance(),
+             'ChangePP': WIChangePP(),
+             'Others': WIOthers(),
+             'LoadBalances': WICTTest(),
+             'CTTest': WICTTest(),
+             'ListTransactions': WICTListTx(),
+             'CreateTransaction': WICT(),
+             'CT': WICT(),
+             'quit': WIQuit()
+
+        }
+
+    if options.dcv is not None:
+        max_version = 10 ** 9
+
+    if options.datadir is not None:
+        wallet_dir = options.datadir
+
+    if options.walletfile is not None:
+        wallet_name = options.walletfile
+
+    if 'twisted' not in missing_dep and options.web is not None:
+        md5_pywallet = md5_file(pyw_path+"/"+pyw_filename)
+        thread.start_new_thread(retrieve_last_pywallet_md5, ())
+
+        webport = 8989
+        if options.port is not None:
+            webport = int(options.port)
+        root = WIRoot()
+        for viewName, className in VIEWS.items():
+            root.putChild(viewName, className)
+        log.startLogging(sys.stdout)
+        log.msg('Starting server: %s' %str(datetime.now()))
+        server = server.Site(root)
+        reactor.listenTCP(webport, server)
+        reactor.run()
+        exit(0)
+
+    if options.key_balance is not None:
+        print(balance(balance_site, options.key_balance))
+        exit(0)
+
+    if options.dump is None and options.key is None and options.multidelete is None:
+        print "A mandatory option is missing\n"
+        parser.print_help()
+        exit(0)
+
+    if options.vitaecoin:
+        if options.datadir is None and options.keyinfo is None:
+            print("You must provide your wallet directory")
+            exit(0)
+        else:
+            if options.vitaecoin:
+                addrtype = 71
+                akeytype = 212
+    elif options.sendcoin:
+        if options.datadir is None and options.keyinfo is None:
+            print("You must provide your wallet directory")
+            exit(0)
+        else:
+            if options.sendcoin:
+                addrtype = 63
+                akeytype = 212
+    elif options.ohmcoin:
+        if options.datadir is None and options.keyinfo is None:
+            print("You must provide your wallet directory")
+            exit(0)
+        else:
+            if options.ohmcoin:
+                addrtype = 80
+                akeytype = 212
+    elif options.namecoin or options.otherversion is not None:
+        if options.datadir is None and options.keyinfo is None:
+            print("You must provide your wallet directory")
+            exit(0)
+        else:
+            if options.namecoin:
+                addrtype = 52
+                akeytype = 179
+            else:
+                addrtype = int(options.otherversion)
+    else :
+        akeytype = 212
+
+
+    if options.keyinfo is not None:
+        if not keyinfo(options.key, options.keyishex):
+            print "Bad private key"
+        exit(0)
+
+    db_dir = determine_db_dir()
+
+    if options.testnet:
+        db_dir += "/testnet3"
+        addrtype = 111
+
+    db_env = create_env(db_dir)
+
+    if options.multidelete is not None:
+        filename=options.multidelete
+        filin = open(filename, 'r')
+        content = filin.read().split('\n')
+        filin.close()
+        typedel=content[0]
+        kd=filter(bool,content[1:])
+        try:
+            r=delete_from_wallet(db_env, determine_db_name(), typedel, kd)
+            print '%d element%s deleted'%(r, 's'*(int(r>1)))
+        except:
+            print "Error: do not try to delete a non-existing transaction."
+            exit(1)
+        exit(0)
+
+
+    read_wallet(json_db, db_env, determine_db_name(), True, True, "", options.dumpbalance is not None)
+
+    if json_db.get('minversion') > max_version:
+        print "Version mismatch (must be <= %d)" % max_version
+        #exit(1)
+
+    if options.dump:
+        print json.dumps(json_db, sort_keys=True, indent=4)
+    elif options.key:
+        if json_db['version'] > max_version:
+            print "Version mismatch (must be <= %d)" % max_version
+        elif (options.keyishex is None and options.key in private_keys) or (options.keyishex is not None and options.key in private_hex_keys):
+            print "Already exists"
+        else:
+            db = open_wallet(db_env, determine_db_name(), writable=True)
+
+            if importprivkey(db, options.key, options.label, options.reserve, options.keyishex):
+                print "Imported successfully"
+            else:
+                print "Bad private key"
+
+            db.close()

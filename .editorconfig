@@ -1,0 +1,52 @@
+# https://editorconfig.org/
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+# Docstrings and comments use max_line_length = 79
+[*.py]
+max_line_length = 119
+
+[*.json]
+indent_size = 2
+insert_final_newline = ignore
+
+[*.{dtd,html,inc,php,phpt,rng,wsdl,xml,xsd,xsl}]
+indent_size              = 4
+indent_style             = space
+
+[*.{ac,m4,sh,yml}]
+indent_size              = 2
+indent_style             = space
+
+[*.md]
+indent_style             = space
+max_line_length          = 80
+
+[COMMIT_EDITMSG]
+indent_size              = 4
+indent_style             = space
+max_line_length          = 80
+
+[*.patch]
+trim_trailing_whitespace = false
+
+# Minified JavaScript files shouldn't be changed
+[**.min.js]
+indent_style = ignore
+insert_final_newline = ignore
+
+# Batch files use tabs for indentation
+[*.bat]
+indent_style = tab
+
+# Makefiles always use tabs for indentation
+[Makefile]
+indent_style = tab
